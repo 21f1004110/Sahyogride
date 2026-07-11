@@ -71,7 +71,7 @@ npm run build
 **backend/.env**
 
 ```env
-DATABASE_URL=postgresql://user:pass@localhost:5432/sahyogride
+DATABASE_URL=postgresql+psycopg://user:pass@localhost:5432/sahyogride
 JWT_SECRET=...
 HOLD_TTL_MINUTES=5
 

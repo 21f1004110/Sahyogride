@@ -4,7 +4,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    database_url: str = "postgresql://user:pass@localhost:5432/sahyogride"
+    database_url: str = "postgresql+psycopg://user:pass@localhost:5432/sahyogride"
     jwt_secret: str = "change-me"
     hold_ttl_minutes: int = 5
 
