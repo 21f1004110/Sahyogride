@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.errors import register_exception_handlers
 from app.routers import ai, auth, holds, reservations, trips
 
 app = FastAPI(title="SahyogRide API")
@@ -12,6 +13,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+register_exception_handlers(app)
 
 app.include_router(auth.router)
 app.include_router(trips.router)
