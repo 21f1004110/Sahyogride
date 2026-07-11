@@ -40,12 +40,33 @@ pip install -r requirements.txt
 
 cp .env.example .env            # then fill in DATABASE_URL, JWT_SECRET, etc.
 
-alembic upgrade head            # once migrations exist (SAHYOG-02)
-python seed.py                  # demo data (SAHYOG-02)
+alembic upgrade head
+python seed.py                  # demo coordinator + rider + one 4-seat trip
 python backfill_embeddings.py   # AI semantic search demo data (SAHYOG-26)
 
 uvicorn app.main:app --reload   # -> http://localhost:8000/docs
 ```
+
+### Local Postgres (dev machine)
+
+This machine has a local Postgres 18 + pgvector cluster installed via conda (no system/root install needed):
+
+```bash
+# start
+pg_ctl -D ~/pgdata -l ~/pgdata/logfile -o "-p 5432" start
+# stop
+pg_ctl -D ~/pgdata stop -m fast
+# check
+pg_isready -p 5432
+```
+
+Role `sahyog` / password `sahyog` owns the `sahyogride` database, with the `vector` extension already enabled. `backend/.env` (gitignored) already points at it:
+
+```env
+DATABASE_URL=postgresql+psycopg://sahyog:sahyog@localhost:5432/sahyogride
+```
+
+If this cluster isn't running (fresh clone, different machine), start it as above, or point `DATABASE_URL` at your own Postgres 15+ with `CREATE EXTENSION vector;` run once.
 
 Run tests:
 
