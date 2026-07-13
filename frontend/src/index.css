@@ -76,4 +76,23 @@
   .blob-1 { animation: blob-drift-1 22s ease-in-out infinite; }
   .blob-2 { animation: blob-drift-2 26s ease-in-out infinite; }
   .blob-3 { animation: blob-drift-3 24s ease-in-out infinite; }
+
+  @keyframes marquee {
+    from { transform: translateX(0); }
+    to { transform: translateX(-50%); }
+  }
+
+  .marquee-track {
+    animation: marquee 34s linear infinite;
+  }
+
+  .marquee-track:hover {
+    animation-play-state: paused;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .marquee-track {
+    animation: none;
+  }
 }

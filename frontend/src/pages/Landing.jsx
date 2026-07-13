@@ -14,6 +14,7 @@ import {
   UserIcon,
 } from "@heroicons/react/24/outline";
 
+import Avatar from "../components/Avatar";
 import BackgroundBlobs from "../components/BackgroundBlobs";
 import HeroIllustration from "../components/HeroIllustration";
 
@@ -80,6 +81,37 @@ const VALUES = [
     title: "Fair by design",
     Icon: ScaleIcon,
     body: "First-come, first-served. No priority tiers, no manual favoritism — the seat map is the same for every rider.",
+  },
+];
+
+const TESTIMONIALS = [
+  {
+    name: "Ayesha R.",
+    role: "Rider",
+    quote:
+      "I held a seat for my mother's dialysis appointment in under a minute — no phone calls, no waiting on someone to confirm.",
+  },
+  {
+    name: "Ramesh K.",
+    role: "Rider",
+    quote:
+      "The seat map made it obvious which seats were actually open. I never had to guess or ask twice.",
+  },
+  {
+    name: "Priya N.",
+    role: "Coordinator, community health outreach",
+    quote:
+      "Publishing a trip takes seconds and the seats fill themselves out fairly — no spreadsheet, no double-bookings.",
+  },
+  {
+    name: "Farhan S.",
+    role: "Rider",
+    quote: "Free, simple, and it actually respected that my seat was mine once I confirmed it.",
+  },
+  {
+    name: "Meera D.",
+    role: "Coordinator, hospital shuttle program",
+    quote: "I can see exactly who's confirmed for each trip without a single phone call.",
   },
 ];
 
@@ -238,9 +270,9 @@ export default function Landing() {
           {AUDIENCES.map((audience, i) => (
             <motion.div
               key={audience.title}
-              initial={reduceMotion ? false : { opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 40, scale: 0.96 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: false, amount: 0.3 }}
               transition={{ duration: 0.5, delay: reduceMotion ? 0 : i * 0.12, ease: "easeOut" }}
               whileHover={reduceMotion ? {} : { y: -4 }}
               className="card p-6"
@@ -275,9 +307,9 @@ export default function Landing() {
           {STEPS.map((step, i) => (
             <motion.div
               key={step.title}
-              initial={reduceMotion ? false : { opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 40, scale: 0.96 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: false, amount: 0.3 }}
               transition={{ duration: 0.5, delay: reduceMotion ? 0 : i * 0.12, ease: "easeOut" }}
               whileHover={reduceMotion ? {} : { y: -4 }}
               className="card p-6"
@@ -304,9 +336,9 @@ export default function Landing() {
           {VALUES.map((value, i) => (
             <motion.div
               key={value.title}
-              initial={reduceMotion ? false : { opacity: 0, y: 24 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 40, scale: 0.96 }}
+              whileInView={{ opacity: 1, y: 0, scale: 1 }}
+              viewport={{ once: false, amount: 0.3 }}
               transition={{ duration: 0.5, delay: reduceMotion ? 0 : i * 0.1, ease: "easeOut" }}
               whileHover={reduceMotion ? {} : { y: -4, scale: 1.02 }}
               className="card p-5"
@@ -325,6 +357,37 @@ export default function Landing() {
         </div>
       </section>
 
+      <section className="pb-24">
+        <div className="max-w-5xl mx-auto px-4">
+          <h2 className="font-heading text-2xl font-bold text-gray-900 text-center mb-2">
+            What people are saying
+          </h2>
+          <p className="text-center text-xs text-gray-400 mb-10">
+            Illustrative examples — placeholder testimonials for a platform still in development.
+          </p>
+        </div>
+
+        <div
+          aria-hidden="true"
+          className="overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_5%,black_95%,transparent)]"
+        >
+          <div className="marquee-track flex gap-5 w-max">
+            {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
+              <div key={`${t.name}-${i}`} className="card p-5 w-80 shrink-0">
+                <div className="flex items-center gap-3 mb-3">
+                  <Avatar name={t.name} index={i} />
+                  <div>
+                    <p className="font-heading font-semibold text-gray-900 text-sm">{t.name}</p>
+                    <p className="text-xs text-gray-500">{t.role}</p>
+                  </div>
+                </div>
+                <p className="text-sm text-gray-600">&ldquo;{t.quote}&rdquo;</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section className="max-w-3xl mx-auto px-4 pb-24">
         <h2 className="font-heading text-2xl font-bold text-gray-900 text-center mb-10">
           Frequently asked questions
@@ -333,9 +396,9 @@ export default function Landing() {
           {FAQS.map((faq, i) => (
             <motion.div
               key={faq.q}
-              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+              initial={reduceMotion ? false : { opacity: 0, y: 28 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, amount: 0.4 }}
+              viewport={{ once: false, amount: 0.6 }}
               transition={{ duration: 0.4, delay: reduceMotion ? 0 : i * 0.08, ease: "easeOut" }}
             >
               <FaqItem
