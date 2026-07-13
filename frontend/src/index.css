@@ -38,6 +38,14 @@
     @apply block text-sm font-medium text-gray-700;
   }
 
+  .input-icon-wrap {
+    @apply relative mt-1;
+  }
+
+  .input-icon {
+    @apply absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400 pointer-events-none;
+  }
+
   .card {
     @apply rounded-2xl border border-gray-200 bg-white shadow-sm;
   }

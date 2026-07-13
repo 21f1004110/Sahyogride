@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { EnvelopeIcon, LockClosedIcon, UserIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 
 import { useAuth } from "../context/AuthContext";
+import BackgroundBlobs from "../components/BackgroundBlobs";
 import ErrorState from "../components/states/ErrorState";
 
 export default function Register() {
@@ -29,14 +31,21 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-b from-brand-50 via-white to-white">
+    <div className="min-h-screen relative flex items-center justify-center px-4 py-10">
+      <BackgroundBlobs />
+
       <div className="w-full max-w-sm">
-        <Link to="/" className="brand-wordmark text-xl block text-center mb-8">
+        <Link to="/" className="brand-wordmark text-xl block text-center mb-6">
           SahyogRide
         </Link>
 
         <form onSubmit={handleSubmit} className="card p-6 space-y-4">
-          <h1 className="font-heading text-2xl font-bold text-gray-900">Create an account</h1>
+          <div className="flex flex-col items-center text-center gap-2 mb-2">
+            <span className="w-12 h-12 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center">
+              <UserPlusIcon className="w-6 h-6" aria-hidden="true" />
+            </span>
+            <h1 className="font-heading text-2xl font-bold text-gray-900">Create an account</h1>
+          </div>
 
           {error && <ErrorState message={error} />}
 
@@ -44,43 +53,52 @@ export default function Register() {
             <label htmlFor="name" className="field-label">
               Name
             </label>
-            <input
-              id="name"
-              type="text"
-              required
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="input-field"
-            />
+            <div className="input-icon-wrap">
+              <UserIcon className="input-icon" aria-hidden="true" />
+              <input
+                id="name"
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="input-field !mt-0 pl-10"
+              />
+            </div>
           </div>
 
           <div>
             <label htmlFor="email" className="field-label">
               Email
             </label>
-            <input
-              id="email"
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="input-field"
-            />
+            <div className="input-icon-wrap">
+              <EnvelopeIcon className="input-icon" aria-hidden="true" />
+              <input
+                id="email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="input-field !mt-0 pl-10"
+              />
+            </div>
           </div>
 
           <div>
             <label htmlFor="password" className="field-label">
               Password
             </label>
-            <input
-              id="password"
-              type="password"
-              required
-              minLength={8}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="input-field"
-            />
+            <div className="input-icon-wrap">
+              <LockClosedIcon className="input-icon" aria-hidden="true" />
+              <input
+                id="password"
+                type="password"
+                required
+                minLength={8}
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="input-field !mt-0 pl-10"
+              />
+            </div>
           </div>
 
           <fieldset>
