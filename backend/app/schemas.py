@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from pydantic import BaseModel, Field, field_validator
 
 from app.models import UserRole
@@ -43,3 +45,24 @@ class UserOut(BaseModel):
 class AuthResponse(BaseModel):
     token: str
     user: UserOut
+
+
+class TripCreateRequest(BaseModel):
+    origin: str = Field(min_length=1, max_length=255)
+    destination: str = Field(min_length=1, max_length=255)
+    departure_time: datetime
+    total_seats: int = Field(gt=0, le=100)
+    purpose: str | None = Field(default=None, max_length=255)
+
+
+class TripOut(BaseModel):
+    id: int
+    coordinator_id: int
+    origin: str
+    destination: str
+    departure_time: datetime
+    total_seats: int
+    purpose: str | None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
