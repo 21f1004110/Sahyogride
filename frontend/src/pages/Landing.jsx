@@ -1,6 +1,18 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
-import { motion, useReducedMotion } from "framer-motion";
-import { CheckCircleIcon, ClockIcon, MagnifyingGlassIcon } from "@heroicons/react/24/outline";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import {
+  BuildingOffice2Icon,
+  CheckCircleIcon,
+  ChevronDownIcon,
+  ClockIcon,
+  GiftIcon,
+  HandRaisedIcon,
+  MagnifyingGlassIcon,
+  ScaleIcon,
+  ShieldCheckIcon,
+  UserIcon,
+} from "@heroicons/react/24/outline";
 
 import BackgroundBlobs from "../components/BackgroundBlobs";
 import HeroIllustration from "../components/HeroIllustration";
@@ -25,8 +37,109 @@ const STEPS = [
 
 const TRUST_BADGES = ["100% free, always", "No payments, ever", "Fair, first-come seating"];
 
+const AUDIENCES = [
+  {
+    title: "Riders",
+    Icon: UserIcon,
+    body: "Anyone who needs a ride for something essential — a hospital appointment, an exam, a shift at work.",
+    points: [
+      "Search trips by origin, destination, date, or purpose",
+      "Hold a seat instantly, no back-and-forth with anyone",
+      "See exactly which seats are open before you pick one",
+    ],
+  },
+  {
+    title: "Coordinators",
+    Icon: BuildingOffice2Icon,
+    body: "NGOs, hospitals, and community organizations that run the shuttles riders depend on.",
+    points: [
+      "Publish a trip and seats are generated automatically",
+      "Seats fill fairly, first-come, with zero manual bookkeeping",
+      "See your confirmed passenger list at a glance",
+    ],
+  },
+];
+
+const VALUES = [
+  {
+    title: "Never double-booked",
+    Icon: ShieldCheckIcon,
+    body: "Every seat hold is protected at the database level, so two riders can never end up with the same seat — even tapping at the exact same moment.",
+  },
+  {
+    title: "Built for everyone",
+    Icon: HandRaisedIcon,
+    body: "Large tap targets, icons alongside every colour, and layouts that hold up for elderly and low-vision riders, not just power users.",
+  },
+  {
+    title: "Always free",
+    Icon: GiftIcon,
+    body: "No payment details, ever. SahyogRide only exists to allocate seats that NGOs and hospitals are already giving away for free.",
+  },
+  {
+    title: "Fair by design",
+    Icon: ScaleIcon,
+    body: "First-come, first-served. No priority tiers, no manual favoritism — the seat map is the same for every rider.",
+  },
+];
+
+const FAQS = [
+  {
+    q: "Is SahyogRide really free?",
+    a: "Yes, always. No payment information is ever collected. Every seat is offered free by the NGO or hospital that published the trip — SahyogRide's only job is fair allocation.",
+  },
+  {
+    q: "What happens if I don't confirm in time?",
+    a: "Holding a seat reserves it for a few minutes while you confirm. If time runs out, it automatically goes back to available so someone else can take it.",
+  },
+  {
+    q: "What if two people tap the same seat at once?",
+    a: "Only one of them gets it. SahyogRide is built so a seat can never be double-booked, even under heavy simultaneous demand — the other rider sees a calm message and can pick another seat.",
+  },
+  {
+    q: "Who can publish a trip?",
+    a: "Any registered coordinator — typically an NGO, hospital, or community organization — can publish a trip with open seats for riders who need it.",
+  },
+];
+
+function FaqItem({ q, a, isOpen, onToggle, reduceMotion }) {
+  return (
+    <div className="card overflow-hidden">
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={isOpen}
+        className="w-full min-h-[44px] flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-gray-50 transition"
+      >
+        <span className="font-heading font-semibold text-gray-900">{q}</span>
+        <motion.span
+          animate={{ rotate: isOpen ? 180 : 0 }}
+          transition={{ duration: reduceMotion ? 0 : 0.2 }}
+          className="text-gray-400 shrink-0"
+        >
+          <ChevronDownIcon className="w-5 h-5" aria-hidden="true" />
+        </motion.span>
+      </button>
+      <AnimatePresence initial={false}>
+        {isOpen && (
+          <motion.div
+            initial={reduceMotion ? false : { height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={reduceMotion ? {} : { height: 0, opacity: 0 }}
+            transition={{ duration: reduceMotion ? 0 : 0.25, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <p className="px-5 pb-4 text-sm text-gray-600">{a}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
 export default function Landing() {
   const reduceMotion = useReducedMotion();
+  const [openFaq, setOpenFaq] = useState(0);
 
   const heroContainer = {
     hidden: {},
@@ -96,12 +209,13 @@ export default function Landing() {
             className="mt-8 flex flex-wrap justify-center sm:justify-start gap-2"
           >
             {TRUST_BADGES.map((badge) => (
-              <li
+              <motion.li
                 key={badge}
+                whileHover={reduceMotion ? {} : { scale: 1.06, y: -1 }}
                 className="text-xs font-medium text-primary-700 bg-primary-50 border border-primary-100 rounded-full px-3 py-1"
               >
                 {badge}
-              </li>
+              </motion.li>
             ))}
           </motion.ul>
         </motion.div>
@@ -114,6 +228,43 @@ export default function Landing() {
         >
           <HeroIllustration />
         </motion.div>
+      </section>
+
+      <section className="max-w-5xl mx-auto px-4 pb-24">
+        <h2 className="font-heading text-2xl font-bold text-gray-900 text-center mb-10">
+          Who it's for
+        </h2>
+        <div className="grid gap-6 sm:grid-cols-2">
+          {AUDIENCES.map((audience, i) => (
+            <motion.div
+              key={audience.title}
+              initial={reduceMotion ? false : { opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.5, delay: reduceMotion ? 0 : i * 0.12, ease: "easeOut" }}
+              whileHover={reduceMotion ? {} : { y: -4 }}
+              className="card p-6"
+            >
+              <motion.div
+                whileHover={reduceMotion ? {} : { scale: 1.1, rotate: -4 }}
+                transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                className="w-11 h-11 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center mb-4"
+              >
+                <audience.Icon className="w-6 h-6" aria-hidden="true" />
+              </motion.div>
+              <h3 className="font-heading font-semibold text-gray-900 mb-1">{audience.title}</h3>
+              <p className="text-sm text-gray-600 mb-4">{audience.body}</p>
+              <ul className="space-y-2">
+                {audience.points.map((point) => (
+                  <li key={point} className="flex items-start gap-2 text-sm text-gray-600">
+                    <CheckCircleIcon className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" aria-hidden="true" />
+                    {point}
+                  </li>
+                ))}
+              </ul>
+            </motion.div>
+          ))}
+        </div>
       </section>
 
       <section className="max-w-5xl mx-auto px-4 pb-24">
@@ -140,6 +291,60 @@ export default function Landing() {
               </motion.div>
               <h3 className="font-heading font-semibold text-gray-900 mb-1">{step.title}</h3>
               <p className="text-sm text-gray-600">{step.body}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      <section className="max-w-5xl mx-auto px-4 pb-24">
+        <h2 className="font-heading text-2xl font-bold text-gray-900 text-center mb-10">
+          Why SahyogRide
+        </h2>
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {VALUES.map((value, i) => (
+            <motion.div
+              key={value.title}
+              initial={reduceMotion ? false : { opacity: 0, y: 24 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.5, delay: reduceMotion ? 0 : i * 0.1, ease: "easeOut" }}
+              whileHover={reduceMotion ? {} : { y: -4, scale: 1.02 }}
+              className="card p-5"
+            >
+              <motion.div
+                whileHover={reduceMotion ? {} : { scale: 1.1 }}
+                transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mb-3"
+              >
+                <value.Icon className="w-5 h-5" aria-hidden="true" />
+              </motion.div>
+              <h3 className="font-heading font-semibold text-gray-900 mb-1 text-sm">{value.title}</h3>
+              <p className="text-xs text-gray-600">{value.body}</p>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      <section className="max-w-3xl mx-auto px-4 pb-24">
+        <h2 className="font-heading text-2xl font-bold text-gray-900 text-center mb-10">
+          Frequently asked questions
+        </h2>
+        <div className="space-y-3">
+          {FAQS.map((faq, i) => (
+            <motion.div
+              key={faq.q}
+              initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, amount: 0.4 }}
+              transition={{ duration: 0.4, delay: reduceMotion ? 0 : i * 0.08, ease: "easeOut" }}
+            >
+              <FaqItem
+                q={faq.q}
+                a={faq.a}
+                isOpen={openFaq === i}
+                onToggle={() => setOpenFaq(openFaq === i ? -1 : i)}
+                reduceMotion={reduceMotion}
+              />
             </motion.div>
           ))}
         </div>
