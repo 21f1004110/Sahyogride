@@ -136,12 +136,12 @@ const FAQS = [
 
 function FaqItem({ q, a, isOpen, onToggle, reduceMotion }) {
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-hidden hover:shadow-lg hover:border-primary-200 transition-shadow">
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={isOpen}
-        className="w-full min-h-[44px] flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-gray-50 transition"
+        className="w-full min-h-[44px] flex items-center justify-between gap-4 px-5 py-4 text-left hover:bg-primary-50/50 transition"
       >
         <span className="font-heading font-semibold text-gray-900">{q}</span>
         <motion.span
@@ -172,6 +172,9 @@ function FaqItem({ q, a, isOpen, onToggle, reduceMotion }) {
 export default function Landing() {
   const reduceMotion = useReducedMotion();
   const [openFaq, setOpenFaq] = useState(0);
+  const [hoveredAudience, setHoveredAudience] = useState(-1);
+  const [hoveredStep, setHoveredStep] = useState(-1);
+  const [hoveredValue, setHoveredValue] = useState(-1);
 
   const heroContainer = {
     hidden: {},
@@ -266,7 +269,10 @@ export default function Landing() {
         <h2 className="font-heading text-2xl font-bold text-gray-900 text-center mb-10">
           Who it's for
         </h2>
-        <div className="grid gap-6 sm:grid-cols-2">
+        <div
+          className="grid gap-6 sm:grid-cols-2"
+          onMouseLeave={() => setHoveredAudience(-1)}
+        >
           {AUDIENCES.map((audience, i) => (
             <motion.div
               key={audience.title}
@@ -274,26 +280,38 @@ export default function Landing() {
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: false, amount: 0.3 }}
               transition={{ duration: 0.5, delay: reduceMotion ? 0 : i * 0.12, ease: "easeOut" }}
-              whileHover={reduceMotion ? {} : { y: -4 }}
-              className="card p-6"
             >
               <motion.div
-                whileHover={reduceMotion ? {} : { scale: 1.1, rotate: -4 }}
-                transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                className="w-11 h-11 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center mb-4"
+                onMouseEnter={() => setHoveredAudience(i)}
+                animate={
+                  reduceMotion
+                    ? { opacity: 1, y: 0 }
+                    : {
+                        opacity: hoveredAudience === -1 || hoveredAudience === i ? 1 : 0.5,
+                        y: hoveredAudience === i ? -6 : 0,
+                      }
+                }
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="card p-6 h-full border-2 border-transparent hover:border-brand-300 hover:shadow-lg transition-[border-color,box-shadow]"
               >
-                <audience.Icon className="w-6 h-6" aria-hidden="true" />
+                <motion.div
+                  whileHover={reduceMotion ? {} : { scale: 1.1, rotate: -4 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                  className="w-11 h-11 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center mb-4"
+                >
+                  <audience.Icon className="w-6 h-6" aria-hidden="true" />
+                </motion.div>
+                <h3 className="font-heading font-semibold text-gray-900 mb-1">{audience.title}</h3>
+                <p className="text-sm text-gray-600 mb-4">{audience.body}</p>
+                <ul className="space-y-2">
+                  {audience.points.map((point) => (
+                    <li key={point} className="flex items-start gap-2 text-sm text-gray-600">
+                      <CheckCircleIcon className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" aria-hidden="true" />
+                      {point}
+                    </li>
+                  ))}
+                </ul>
               </motion.div>
-              <h3 className="font-heading font-semibold text-gray-900 mb-1">{audience.title}</h3>
-              <p className="text-sm text-gray-600 mb-4">{audience.body}</p>
-              <ul className="space-y-2">
-                {audience.points.map((point) => (
-                  <li key={point} className="flex items-start gap-2 text-sm text-gray-600">
-                    <CheckCircleIcon className="w-4 h-4 text-brand-500 mt-0.5 shrink-0" aria-hidden="true" />
-                    {point}
-                  </li>
-                ))}
-              </ul>
             </motion.div>
           ))}
         </div>
@@ -303,7 +321,7 @@ export default function Landing() {
         <h2 className="font-heading text-2xl font-bold text-gray-900 text-center mb-10">
           How it works
         </h2>
-        <div className="grid gap-6 sm:grid-cols-3">
+        <div className="grid gap-6 sm:grid-cols-3" onMouseLeave={() => setHoveredStep(-1)}>
           {STEPS.map((step, i) => (
             <motion.div
               key={step.title}
@@ -311,18 +329,30 @@ export default function Landing() {
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: false, amount: 0.3 }}
               transition={{ duration: 0.5, delay: reduceMotion ? 0 : i * 0.12, ease: "easeOut" }}
-              whileHover={reduceMotion ? {} : { y: -4 }}
-              className="card p-6"
             >
               <motion.div
-                whileHover={reduceMotion ? {} : { scale: 1.1, rotate: 4 }}
-                transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                className="w-11 h-11 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mb-4"
+                onMouseEnter={() => setHoveredStep(i)}
+                animate={
+                  reduceMotion
+                    ? { opacity: 1, y: 0 }
+                    : {
+                        opacity: hoveredStep === -1 || hoveredStep === i ? 1 : 0.5,
+                        y: hoveredStep === i ? -6 : 0,
+                      }
+                }
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="card p-6 h-full border-2 border-transparent hover:border-primary-300 hover:shadow-lg transition-[border-color,box-shadow]"
               >
-                <step.Icon className="w-6 h-6" aria-hidden="true" />
+                <motion.div
+                  whileHover={reduceMotion ? {} : { scale: 1.1, rotate: 4 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 15 }}
+                  className="w-11 h-11 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mb-4"
+                >
+                  <step.Icon className="w-6 h-6" aria-hidden="true" />
+                </motion.div>
+                <h3 className="font-heading font-semibold text-gray-900 mb-1">{step.title}</h3>
+                <p className="text-sm text-gray-600">{step.body}</p>
               </motion.div>
-              <h3 className="font-heading font-semibold text-gray-900 mb-1">{step.title}</h3>
-              <p className="text-sm text-gray-600">{step.body}</p>
             </motion.div>
           ))}
         </div>
@@ -332,7 +362,10 @@ export default function Landing() {
         <h2 className="font-heading text-2xl font-bold text-gray-900 text-center mb-10">
           Why SahyogRide
         </h2>
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+        <div
+          className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4"
+          onMouseLeave={() => setHoveredValue(-1)}
+        >
           {VALUES.map((value, i) => (
             <motion.div
               key={value.title}
@@ -340,18 +373,37 @@ export default function Landing() {
               whileInView={{ opacity: 1, y: 0, scale: 1 }}
               viewport={{ once: false, amount: 0.3 }}
               transition={{ duration: 0.5, delay: reduceMotion ? 0 : i * 0.1, ease: "easeOut" }}
-              whileHover={reduceMotion ? {} : { y: -4, scale: 1.02 }}
-              className="card p-5"
             >
               <motion.div
-                whileHover={reduceMotion ? {} : { scale: 1.1 }}
-                transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                className="w-10 h-10 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center mb-3"
+                onMouseEnter={() => setHoveredValue(i)}
+                animate={
+                  reduceMotion
+                    ? { opacity: 1, scale: 1 }
+                    : {
+                        opacity: hoveredValue === -1 || hoveredValue === i ? 1 : 0.5,
+                        scale: hoveredValue === i ? 1.05 : hoveredValue === -1 ? 1 : 0.96,
+                      }
+                }
+                transition={{ duration: 0.25, ease: "easeOut" }}
+                className="card p-5 h-full hover:shadow-lg transition-shadow"
               >
-                <value.Icon className="w-5 h-5" aria-hidden="true" />
+                <motion.div
+                  animate={
+                    reduceMotion
+                      ? {}
+                      : {
+                          backgroundColor: hoveredValue === i ? "#4F46E5" : "#EEF2FF",
+                          color: hoveredValue === i ? "#FFFFFF" : "#4338CA",
+                        }
+                  }
+                  transition={{ duration: 0.25 }}
+                  className="w-10 h-10 rounded-full flex items-center justify-center mb-3"
+                >
+                  <value.Icon className="w-5 h-5" aria-hidden="true" />
+                </motion.div>
+                <h3 className="font-heading font-semibold text-gray-900 mb-1 text-sm">{value.title}</h3>
+                <p className="text-xs text-gray-600">{value.body}</p>
               </motion.div>
-              <h3 className="font-heading font-semibold text-gray-900 mb-1 text-sm">{value.title}</h3>
-              <p className="text-xs text-gray-600">{value.body}</p>
             </motion.div>
           ))}
         </div>
@@ -373,7 +425,10 @@ export default function Landing() {
         >
           <div className="marquee-track flex gap-5 w-max">
             {[...TESTIMONIALS, ...TESTIMONIALS].map((t, i) => (
-              <div key={`${t.name}-${i}`} className="card p-5 w-80 shrink-0">
+              <div
+                key={`${t.name}-${i}`}
+                className="card p-5 w-80 shrink-0 hover:shadow-lg hover:-translate-y-1 hover:border-primary-300 transition"
+              >
                 <div className="flex items-center gap-3 mb-3">
                   <Avatar name={t.name} index={i} />
                   <div>
