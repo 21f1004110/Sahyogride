@@ -4,6 +4,7 @@ import { useAuth } from "./context/AuthContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import CreateTrip from "./pages/CreateTrip";
+import SearchTrips from "./pages/SearchTrips";
 
 function Home() {
   const { user, logout } = useAuth();
@@ -15,6 +16,11 @@ function Home() {
         <div className="text-center space-y-2">
           <p>
             Signed in as {user.name} ({user.role})
+          </p>
+          <p>
+            <Link to="/trips" className="underline">
+              Search trips
+            </Link>
           </p>
           {user.role === "coordinator" && (
             <p>
@@ -56,6 +62,14 @@ function App() {
         element={
           <RequireAuth>
             <Home />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/trips"
+        element={
+          <RequireAuth>
+            <SearchTrips />
           </RequireAuth>
         }
       />

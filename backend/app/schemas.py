@@ -66,3 +66,19 @@ class TripOut(BaseModel):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class TripListItem(BaseModel):
+    id: int
+    origin: str
+    destination: str
+    departure_time: datetime
+    total_seats: int
+    seats_available: int
+    purpose: str | None
+
+    model_config = {"from_attributes": True}
+
+
+class TripListResponse(BaseModel):
+    trips: list[TripListItem]
