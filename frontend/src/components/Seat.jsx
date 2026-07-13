@@ -1,7 +1,19 @@
-const STATUS_STYLES = {
-  available: { icon: "✓", classes: "bg-green-100 text-green-800 border-green-300" },
-  held: { icon: "⏳", classes: "bg-amber-100 text-amber-800 border-amber-300" },
-  reserved: { icon: "✕", classes: "bg-gray-200 text-gray-600 border-gray-300" },
+export const STATUS_STYLES = {
+  available: {
+    icon: "✓",
+    label: "Available",
+    classes: "bg-green-100 text-green-800 border-green-300",
+  },
+  held: {
+    icon: "⏳",
+    label: "Held by someone",
+    classes: "bg-amber-100 text-amber-800 border-amber-300",
+  },
+  reserved: {
+    icon: "✕",
+    label: "Reserved",
+    classes: "bg-gray-200 text-gray-600 border-gray-300",
+  },
 };
 
 export default function Seat({ seat, onClick }) {
