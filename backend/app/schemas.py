@@ -100,3 +100,17 @@ class TripDetailOut(BaseModel):
     total_seats: int
     purpose: str | None
     seats: list[SeatOut]
+
+
+class HoldCreateRequest(BaseModel):
+    seat_id: int
+
+
+class HoldOut(BaseModel):
+    id: int
+    seat_id: int
+    trip_id: int
+    rider_id: int
+    expires_at: datetime
+
+    model_config = {"from_attributes": True}

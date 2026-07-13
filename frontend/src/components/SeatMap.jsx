@@ -1,6 +1,6 @@
 import Seat from "./Seat";
 
-export default function SeatMap({ seats }) {
+export default function SeatMap({ seats, onSeatClick }) {
   return (
     <div
       role="list"
@@ -9,7 +9,7 @@ export default function SeatMap({ seats }) {
     >
       {seats.map((seat) => (
         <div role="listitem" key={seat.id}>
-          <Seat seat={seat} />
+          <Seat seat={seat} onClick={onSeatClick} />
         </div>
       ))}
     </div>

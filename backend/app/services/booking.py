@@ -48,3 +48,17 @@ def hold_seat(db: Session, seat_id: int, rider_id: int) -> Hold:
 
     db.refresh(hold)
     return hold
+
+
+def release_hold(db: Session, hold_id: int, rider_id: int) -> None:
+    hold = db.get(Hold, hold_id)
+    if hold is None:
+        raise AppError("NOT_FOUND")
+    if hold.rider_id != rider_id:
+        raise AppError("NOT_OWNER")
+
+    seat = db.query(Seat).filter(Seat.id == hold.seat_id).with_for_update().first()
+    db.delete(hold)
+    if seat is not None and seat.status == SeatStatus.HELD:
+        seat.status = SeatStatus.AVAILABLE
+    db.commit()
