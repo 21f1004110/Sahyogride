@@ -1,12 +1,56 @@
-import { createContext, useContext } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 
-// Real login/register/token state lands here in SAHYOG-04.
+import * as authApi from "../api/auth";
+import { TOKEN_STORAGE_KEY } from "../api/client";
+
+const USER_STORAGE_KEY = "sahyogride_user";
+
 const AuthContext = createContext(null);
 
+function readStoredUser() {
+  const raw = localStorage.getItem(USER_STORAGE_KEY);
+  return raw ? JSON.parse(raw) : null;
+}
+
 export function AuthProvider({ children }) {
-  return <AuthContext.Provider value={null}>{children}</AuthContext.Provider>;
+  const [user, setUser] = useState(readStoredUser);
+
+  function persist(token, user) {
+    localStorage.setItem(TOKEN_STORAGE_KEY, token);
+    localStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+    setUser(user);
+  }
+
+  async function register(fields) {
+    const data = await authApi.register(fields);
+    persist(data.token, data.user);
+    return data.user;
+  }
+
+  async function login(fields) {
+    const data = await authApi.login(fields);
+    persist(data.token, data.user);
+    return data.user;
+  }
+
+  function logout() {
+    localStorage.removeItem(TOKEN_STORAGE_KEY);
+    localStorage.removeItem(USER_STORAGE_KEY);
+    setUser(null);
+  }
+
+  const value = useMemo(
+    () => ({ user, isAuthenticated: !!user, register, login, logout }),
+    [user],
+  );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
 export function useAuth() {
-  return useContext(AuthContext);
+  const ctx = useContext(AuthContext);
+  if (!ctx) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return ctx;
 }

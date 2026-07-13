@@ -1,1 +1,45 @@
-# Pydantic request/response schemas land here as each endpoint ticket is built.
+from pydantic import BaseModel, Field, field_validator
+
+from app.models import UserRole
+
+SELF_REGISTER_ROLES = {UserRole.RIDER, UserRole.COORDINATOR}
+
+
+class RegisterRequest(BaseModel):
+    name: str = Field(min_length=1, max_length=120)
+    email: str = Field(min_length=3, max_length=255)
+    password: str = Field(min_length=8, max_length=255)
+    role: UserRole
+
+    @field_validator("role")
+    @classmethod
+    def role_must_be_self_registerable(cls, value: UserRole) -> UserRole:
+        if value not in SELF_REGISTER_ROLES:
+            raise ValueError("role must be 'rider' or 'coordinator'")
+        return value
+
+    @field_validator("email")
+    @classmethod
+    def email_must_look_like_email(cls, value: str) -> str:
+        if "@" not in value or "." not in value.split("@")[-1]:
+            raise ValueError("must be a valid email address")
+        return value.lower()
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+class UserOut(BaseModel):
+    id: int
+    name: str
+    email: str
+    role: UserRole
+
+    model_config = {"from_attributes": True}
+
+
+class AuthResponse(BaseModel):
+    token: str
+    user: UserOut
