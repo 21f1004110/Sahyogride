@@ -22,4 +22,7 @@ export async function searchTrips({ origin, destination, date, q } = {}) {
   return res.data;
 }
 
-// getTrip() lands here starting SAHYOG-07.
+export async function getTrip(id) {
+  const res = await client.get(`/trips/${id}`);
+  return res.data;
+}

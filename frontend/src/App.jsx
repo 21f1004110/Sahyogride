@@ -5,6 +5,7 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import CreateTrip from "./pages/CreateTrip";
 import SearchTrips from "./pages/SearchTrips";
+import TripDetail from "./pages/TripDetail";
 
 function Home() {
   const { user, logout } = useAuth();
@@ -70,6 +71,14 @@ function App() {
         element={
           <RequireAuth>
             <SearchTrips />
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/trips/:id"
+        element={
+          <RequireAuth>
+            <TripDetail />
           </RequireAuth>
         }
       />

@@ -3,8 +3,9 @@ from datetime import date as date_type
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Seat, SeatStatus, Trip, User
-from app.schemas import TripCreateRequest
+from app.errors import AppError
+from app.models import Hold, Seat, SeatStatus, Trip, User
+from app.schemas import SeatOut, TripCreateRequest, TripDetailOut
 
 
 def create_trip(db: Session, coordinator: User, data: TripCreateRequest) -> Trip:
@@ -57,3 +58,35 @@ def search_trips(
         )
 
     return query.order_by(Trip.departure_time).all()
+
+
+def get_trip_detail(db: Session, trip_id: int, rider_id: int) -> TripDetailOut:
+    trip = db.get(Trip, trip_id)
+    if trip is None:
+        raise AppError("NOT_FOUND")
+
+    held_seat_id = (
+        db.query(Hold.seat_id).filter(Hold.trip_id == trip_id, Hold.rider_id == rider_id).scalar()
+    )
+
+    seats = sorted(trip.seats, key=lambda s: int(s.seat_number))
+    seat_items = [
+        SeatOut(
+            id=seat.id,
+            seat_number=seat.seat_number,
+            status=seat.status.value,
+            held_by_me=seat.id == held_seat_id,
+        )
+        for seat in seats
+    ]
+
+    return TripDetailOut(
+        id=trip.id,
+        coordinator_id=trip.coordinator_id,
+        origin=trip.origin,
+        destination=trip.destination,
+        departure_time=trip.departure_time,
+        total_seats=trip.total_seats,
+        purpose=trip.purpose,
+        seats=seat_items,
+    )

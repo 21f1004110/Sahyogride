@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_role
 from app.models import User, UserRole
-from app.schemas import TripCreateRequest, TripListItem, TripListResponse, TripOut
-from app.services.trip_service import create_trip, search_trips
+from app.schemas import TripCreateRequest, TripDetailOut, TripListItem, TripListResponse, TripOut
+from app.services.trip_service import create_trip, get_trip_detail, search_trips
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 
@@ -45,3 +45,12 @@ def search_trips_endpoint(
         for trip, seats_available in results
     ]
     return TripListResponse(trips=trips)
+
+
+@router.get("/{trip_id}", response_model=TripDetailOut)
+def get_trip_endpoint(
+    trip_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> TripDetailOut:
+    return get_trip_detail(db, trip_id, user.id)

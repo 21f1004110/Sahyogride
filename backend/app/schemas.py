@@ -82,3 +82,21 @@ class TripListItem(BaseModel):
 
 class TripListResponse(BaseModel):
     trips: list[TripListItem]
+
+
+class SeatOut(BaseModel):
+    id: int
+    seat_number: str
+    status: str
+    held_by_me: bool
+
+
+class TripDetailOut(BaseModel):
+    id: int
+    coordinator_id: int
+    origin: str
+    destination: str
+    departure_time: datetime
+    total_seats: int
+    purpose: str | None
+    seats: list[SeatOut]

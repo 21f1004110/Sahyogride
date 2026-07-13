@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "react-router-dom";
 
 import { searchTrips } from "../api/trips";
 import Empty from "../components/states/Empty";
@@ -95,16 +96,18 @@ export default function SearchTrips() {
         <ul className="space-y-3">
           {data.trips.map((trip) => (
             <li key={trip.id} className="rounded border border-gray-300 p-3">
-              <p className="font-medium">
-                {trip.origin} &rarr; {trip.destination}
-              </p>
-              <p className="text-sm text-gray-600">
-                {new Date(trip.departure_time).toLocaleString()}
-              </p>
-              <p className="text-sm">
-                {trip.seats_available} of {trip.total_seats} seats available
-              </p>
-              {trip.purpose && <p className="text-sm text-gray-600">{trip.purpose}</p>}
+              <Link to={`/trips/${trip.id}`} className="block">
+                <p className="font-medium">
+                  {trip.origin} &rarr; {trip.destination}
+                </p>
+                <p className="text-sm text-gray-600">
+                  {new Date(trip.departure_time).toLocaleString()}
+                </p>
+                <p className="text-sm">
+                  {trip.seats_available} of {trip.total_seats} seats available
+                </p>
+                {trip.purpose && <p className="text-sm text-gray-600">{trip.purpose}</p>}
+              </Link>
             </li>
           ))}
         </ul>
