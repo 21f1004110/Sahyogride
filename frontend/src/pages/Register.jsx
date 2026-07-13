@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import ErrorState from "../components/states/ErrorState";
-import Loading from "../components/states/Loading";
 
 export default function Register() {
   const { register } = useAuth();
@@ -30,93 +29,112 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold">Create an account</h1>
+    <div className="min-h-screen flex items-center justify-center px-4 py-10 bg-gradient-to-b from-brand-50 via-white to-white">
+      <div className="w-full max-w-sm">
+        <Link to="/" className="brand-wordmark text-xl block text-center mb-8">
+          SahyogRide
+        </Link>
 
-        {error && <ErrorState message={error} />}
+        <form onSubmit={handleSubmit} className="card p-6 space-y-4">
+          <h1 className="font-heading text-2xl font-bold text-gray-900">Create an account</h1>
 
-        <div>
-          <label htmlFor="name" className="block text-sm font-medium">
-            Name
-          </label>
-          <input
-            id="name"
-            type="text"
-            required
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
-          />
-        </div>
+          {error && <ErrorState message={error} />}
 
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
-          />
-        </div>
-
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
-          />
-        </div>
-
-        <fieldset>
-          <legend className="block text-sm font-medium">I am a</legend>
-          <div className="mt-1 flex gap-4">
-            <label className="flex items-center gap-2 min-h-[44px]">
-              <input
-                type="radio"
-                name="role"
-                value="rider"
-                checked={role === "rider"}
-                onChange={() => setRole("rider")}
-              />
-              Rider
+          <div>
+            <label htmlFor="name" className="field-label">
+              Name
             </label>
-            <label className="flex items-center gap-2 min-h-[44px]">
-              <input
-                type="radio"
-                name="role"
-                value="coordinator"
-                checked={role === "coordinator"}
-                onChange={() => setRole("coordinator")}
-              />
-              Coordinator
-            </label>
+            <input
+              id="name"
+              type="text"
+              required
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              className="input-field"
+            />
           </div>
-        </fieldset>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full min-h-[44px] rounded bg-blue-600 text-white font-medium disabled:opacity-50"
-        >
-          {loading ? <Loading /> : "Register"}
-        </button>
+          <div>
+            <label htmlFor="email" className="field-label">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="input-field"
+            />
+          </div>
 
-        <p className="text-sm text-center">
-          Already have an account? <Link to="/login" className="underline">Log in</Link>
-        </p>
-      </form>
+          <div>
+            <label htmlFor="password" className="field-label">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input-field"
+            />
+          </div>
+
+          <fieldset>
+            <legend className="field-label">I am a</legend>
+            <div className="mt-2 flex gap-3">
+              <label
+                className={`flex-1 flex items-center justify-center gap-2 min-h-[44px] rounded-xl border px-3 cursor-pointer focus-within:ring-2 focus-within:ring-primary-500 ${
+                  role === "rider"
+                    ? "border-primary-500 bg-primary-50 text-primary-700"
+                    : "border-gray-300 text-gray-600"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  value="rider"
+                  checked={role === "rider"}
+                  onChange={() => setRole("rider")}
+                  className="sr-only"
+                />
+                Rider
+              </label>
+              <label
+                className={`flex-1 flex items-center justify-center gap-2 min-h-[44px] rounded-xl border px-3 cursor-pointer focus-within:ring-2 focus-within:ring-primary-500 ${
+                  role === "coordinator"
+                    ? "border-primary-500 bg-primary-50 text-primary-700"
+                    : "border-gray-300 text-gray-600"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="role"
+                  value="coordinator"
+                  checked={role === "coordinator"}
+                  onChange={() => setRole("coordinator")}
+                  className="sr-only"
+                />
+                Coordinator
+              </label>
+            </div>
+          </fieldset>
+
+          <button type="submit" disabled={loading} className="btn-primary w-full">
+            {loading ? "Creating account…" : "Register"}
+          </button>
+
+          <p className="text-sm text-center text-gray-600">
+            Already have an account?{" "}
+            <Link to="/login" className="text-primary-600 font-medium hover:underline">
+              Log in
+            </Link>
+          </p>
+        </form>
+      </div>
     </div>
   );
 }

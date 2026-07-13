@@ -22,12 +22,12 @@ export default function SearchTrips() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-md mx-auto">
-      <h1 className="text-2xl font-semibold mb-4">Search trips</h1>
+    <div className="max-w-md mx-auto px-4 py-10">
+      <h1 className="font-heading text-2xl font-bold text-gray-900 mb-4">Search trips</h1>
 
-      <form onSubmit={handleSubmit} className="space-y-3 mb-6">
+      <form onSubmit={handleSubmit} className="card p-4 space-y-3 mb-6">
         <div>
-          <label htmlFor="origin" className="block text-sm font-medium">
+          <label htmlFor="origin" className="field-label">
             Origin
           </label>
           <input
@@ -35,12 +35,12 @@ export default function SearchTrips() {
             type="text"
             value={filters.origin}
             onChange={(e) => setFilters((f) => ({ ...f, origin: e.target.value }))}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
+            className="input-field"
           />
         </div>
 
         <div>
-          <label htmlFor="destination" className="block text-sm font-medium">
+          <label htmlFor="destination" className="field-label">
             Destination
           </label>
           <input
@@ -48,12 +48,12 @@ export default function SearchTrips() {
             type="text"
             value={filters.destination}
             onChange={(e) => setFilters((f) => ({ ...f, destination: e.target.value }))}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
+            className="input-field"
           />
         </div>
 
         <div>
-          <label htmlFor="date" className="block text-sm font-medium">
+          <label htmlFor="date" className="field-label">
             Date
           </label>
           <input
@@ -61,12 +61,12 @@ export default function SearchTrips() {
             type="date"
             value={filters.date}
             onChange={(e) => setFilters((f) => ({ ...f, date: e.target.value }))}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
+            className="input-field"
           />
         </div>
 
         <div>
-          <label htmlFor="q" className="block text-sm font-medium">
+          <label htmlFor="q" className="field-label">
             Search
           </label>
           <input
@@ -75,14 +75,11 @@ export default function SearchTrips() {
             placeholder="e.g. hospital, exam, work"
             value={filters.q}
             onChange={(e) => setFilters((f) => ({ ...f, q: e.target.value }))}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
+            className="input-field"
           />
         </div>
 
-        <button
-          type="submit"
-          className="w-full min-h-[44px] rounded bg-blue-600 text-white font-medium"
-        >
+        <button type="submit" className="btn-primary w-full">
           Search
         </button>
       </form>
@@ -95,15 +92,15 @@ export default function SearchTrips() {
       {!isLoading && !isError && data.trips.length > 0 && (
         <ul className="space-y-3">
           {data.trips.map((trip) => (
-            <li key={trip.id} className="rounded border border-gray-300 p-3">
-              <Link to={`/trips/${trip.id}`} className="block">
-                <p className="font-medium">
+            <li key={trip.id}>
+              <Link to={`/trips/${trip.id}`} className="card block p-4 hover:shadow-md transition">
+                <p className="font-heading font-semibold text-gray-900">
                   {trip.origin} &rarr; {trip.destination}
                 </p>
                 <p className="text-sm text-gray-600">
                   {new Date(trip.departure_time).toLocaleString()}
                 </p>
-                <p className="text-sm">
+                <p className="text-sm text-primary-700 font-medium">
                   {trip.seats_available} of {trip.total_seats} seats available
                 </p>
                 {trip.purpose && <p className="text-sm text-gray-600">{trip.purpose}</p>}

@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext";
 import ErrorState from "../components/states/ErrorState";
-import Loading from "../components/states/Loading";
 
 export default function Login() {
   const { login } = useAuth();
@@ -28,53 +27,58 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold">Log in</h1>
+    <div className="min-h-screen flex items-center justify-center px-4 bg-gradient-to-b from-brand-50 via-white to-white">
+      <div className="w-full max-w-sm">
+        <Link to="/" className="brand-wordmark text-xl block text-center mb-8">
+          SahyogRide
+        </Link>
 
-        {error && <ErrorState message={error} />}
+        <form onSubmit={handleSubmit} className="card p-6 space-y-4">
+          <h1 className="font-heading text-2xl font-bold text-gray-900">Log in</h1>
 
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
-          />
-        </div>
+          {error && <ErrorState message={error} />}
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            required
-            minLength={8}
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
-          />
-        </div>
+          <div>
+            <label htmlFor="email" className="field-label">
+              Email
+            </label>
+            <input
+              id="email"
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="input-field"
+            />
+          </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full min-h-[44px] rounded bg-blue-600 text-white font-medium disabled:opacity-50"
-        >
-          {loading ? <Loading /> : "Log in"}
-        </button>
+          <div>
+            <label htmlFor="password" className="field-label">
+              Password
+            </label>
+            <input
+              id="password"
+              type="password"
+              required
+              minLength={8}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="input-field"
+            />
+          </div>
 
-        <p className="text-sm text-center">
-          Don't have an account? <Link to="/register" className="underline">Register</Link>
-        </p>
-      </form>
+          <button type="submit" disabled={loading} className="btn-primary w-full">
+            {loading ? "Logging in…" : "Log in"}
+          </button>
+
+          <p className="text-sm text-center text-gray-600">
+            Don't have an account?{" "}
+            <Link to="/register" className="text-primary-600 font-medium hover:underline">
+              Register
+            </Link>
+          </p>
+        </form>
+      </div>
     </div>
   );
 }

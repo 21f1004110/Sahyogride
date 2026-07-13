@@ -2,7 +2,6 @@ import { useState } from "react";
 
 import { createTrip } from "../api/trips";
 import ErrorState from "../components/states/ErrorState";
-import Loading from "../components/states/Loading";
 
 export default function CreateTrip() {
   const [origin, setOrigin] = useState("");
@@ -40,19 +39,19 @@ export default function CreateTrip() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center px-4">
-      <form onSubmit={handleSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-2xl font-semibold">Create a trip</h1>
+    <div className="max-w-sm mx-auto px-4 py-10">
+      <form onSubmit={handleSubmit} className="card p-6 space-y-4">
+        <h1 className="font-heading text-2xl font-bold text-gray-900">Create a trip</h1>
 
         {created && (
-          <p role="status" className="text-green-700">
+          <p role="status" className="rounded-xl bg-green-50 text-green-800 px-3 py-2 text-sm">
             Trip #{created.id} created with {created.total_seats} seats.
           </p>
         )}
         {error && <ErrorState message={error} />}
 
         <div>
-          <label htmlFor="origin" className="block text-sm font-medium">
+          <label htmlFor="origin" className="field-label">
             Origin
           </label>
           <input
@@ -61,12 +60,12 @@ export default function CreateTrip() {
             required
             value={origin}
             onChange={(e) => setOrigin(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
+            className="input-field"
           />
         </div>
 
         <div>
-          <label htmlFor="destination" className="block text-sm font-medium">
+          <label htmlFor="destination" className="field-label">
             Destination
           </label>
           <input
@@ -75,12 +74,12 @@ export default function CreateTrip() {
             required
             value={destination}
             onChange={(e) => setDestination(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
+            className="input-field"
           />
         </div>
 
         <div>
-          <label htmlFor="departure_time" className="block text-sm font-medium">
+          <label htmlFor="departure_time" className="field-label">
             Departure time
           </label>
           <input
@@ -89,12 +88,12 @@ export default function CreateTrip() {
             required
             value={departureTime}
             onChange={(e) => setDepartureTime(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
+            className="input-field"
           />
         </div>
 
         <div>
-          <label htmlFor="total_seats" className="block text-sm font-medium">
+          <label htmlFor="total_seats" className="field-label">
             Total seats
           </label>
           <input
@@ -105,12 +104,12 @@ export default function CreateTrip() {
             required
             value={totalSeats}
             onChange={(e) => setTotalSeats(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
+            className="input-field"
           />
         </div>
 
         <div>
-          <label htmlFor="purpose" className="block text-sm font-medium">
+          <label htmlFor="purpose" className="field-label">
             Purpose (optional)
           </label>
           <input
@@ -118,16 +117,12 @@ export default function CreateTrip() {
             type="text"
             value={purpose}
             onChange={(e) => setPurpose(e.target.value)}
-            className="mt-1 block w-full min-h-[44px] rounded border border-gray-300 px-3"
+            className="input-field"
           />
         </div>
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="w-full min-h-[44px] rounded bg-blue-600 text-white font-medium disabled:opacity-50"
-        >
-          {loading ? <Loading /> : "Create trip"}
+        <button type="submit" disabled={loading} className="btn-primary w-full">
+          {loading ? "Creating…" : "Create trip"}
         </button>
       </form>
     </div>

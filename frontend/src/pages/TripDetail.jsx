@@ -58,28 +58,30 @@ export default function TripDetail() {
   }
 
   return (
-    <div className="min-h-screen px-4 py-6 max-w-md mx-auto">
-      <h1 className="text-2xl font-semibold">
+    <div className="max-w-md mx-auto px-4 py-10">
+      <h1 className="font-heading text-2xl font-bold text-gray-900">
         {trip.origin} &rarr; {trip.destination}
       </h1>
       <p className="text-sm text-gray-600 mb-1">{new Date(trip.departure_time).toLocaleString()}</p>
       {trip.purpose && <p className="text-sm text-gray-600 mb-4">{trip.purpose}</p>}
 
       {seatTakenMessage && (
-        <p role="status" className="mb-4 rounded bg-blue-50 text-blue-800 px-3 py-2 text-sm">
+        <p role="status" className="mb-4 rounded-xl bg-primary-50 text-primary-800 px-3 py-2 text-sm">
           {seatTakenMessage}
         </p>
       )}
 
-      <SeatMap seats={trip.seats} onSeatClick={canHold ? handleSeatClick : undefined} />
+      <div className="card p-4">
+        <SeatMap seats={trip.seats} onSeatClick={canHold ? handleSeatClick : undefined} />
+      </div>
 
       {activeHold && (
-        <div className="mt-4 space-y-2">
+        <div className="card p-4 mt-4 space-y-3">
           <HoldCountdown expiresAt={activeHold.expiresAt} />
           <button
             type="button"
             onClick={() => releaseMutation.mutate(activeHold.holdId)}
-            className="min-h-[44px] px-4 rounded border border-gray-300"
+            className="btn-secondary w-full"
           >
             Release seat
           </button>

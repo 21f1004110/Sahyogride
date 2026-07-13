@@ -22,12 +22,17 @@ export default function HoldCountdown({ expiresAt }) {
   }, [expiresAt]);
 
   if (remaining <= 0) {
-    return <p role="status">Your hold has expired.</p>;
+    return (
+      <p role="status" className="text-sm text-gray-600">
+        Your hold has expired.
+      </p>
+    );
   }
 
   return (
-    <p role="status">
-      Hold expires in <span className="font-medium">{formatTime(remaining)}</span>
+    <p role="status" className="text-sm text-gray-700">
+      Hold expires in{" "}
+      <span className="font-heading font-semibold text-primary-700">{formatTime(remaining)}</span>
     </p>
   );
 }

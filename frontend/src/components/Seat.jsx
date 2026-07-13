@@ -16,9 +16,9 @@ export default function Seat({ seat, onClick }) {
       title={label}
       disabled={!clickable}
       onClick={clickable ? () => onClick(seat) : undefined}
-      className={`min-w-[44px] min-h-[44px] flex flex-col items-center justify-center rounded border text-sm font-medium ${classes} ${
-        seat.held_by_me ? "ring-2 ring-blue-500" : ""
-      } ${clickable ? "cursor-pointer hover:opacity-80" : "cursor-default"}`}
+      className={`min-w-[44px] min-h-[44px] flex flex-col items-center justify-center rounded-xl border text-sm font-medium transition ${classes} ${
+        seat.held_by_me ? "ring-2 ring-primary-500" : ""
+      } ${clickable ? "cursor-pointer hover:scale-105 hover:shadow-sm" : "cursor-default"}`}
     >
       <span aria-hidden="true">{icon}</span>
       <span className="text-xs">{seat.seat_number}</span>
