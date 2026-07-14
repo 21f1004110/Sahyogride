@@ -1,0 +1,130 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="988" height="892" viewBox="0 0 988 892" font-family="Helvetica, Arial, sans-serif">
+<rect width="988" height="892" fill="#e2e8f0"/>
+<text x="20" y="30" font-size="18" font-weight="bold" fill="#0f172a">SahyogRide — Kanban Board</text>
+<text x="20" y="48" font-size="11" fill="#475569">Snapshot as of 13 July 2026 (end of Sprint 1, Day 3) · ★ = star test ticket (never mergeable if broken)</text>
+<rect x="20" y="66" width="300" height="798" rx="8" fill="#f1f5f9" stroke="#cbd5e1" stroke-width="1"/>
+<rect x="20" y="66" width="300" height="6" fill="#64748b" rx="3"/>
+<text x="36" y="96" font-size="13.5" font-weight="bold" fill="#64748b">To Do</text>
+<circle cx="296" cy="91" r="12" fill="#64748b"/>
+<text x="296" y="95" font-size="11" font-weight="bold" fill="white" text-anchor="middle">11</text>
+<rect x="32" y="122" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="122" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="140" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-19</text>
+<text x="44" y="156" font-size="11" fill="#0f172a">Concurrency test suite ★</text>
+<text x="44" y="170" font-size="9.5" fill="#94a3b8">TM5</text>
+<rect x="32" y="188" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="188" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="206" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-20</text>
+<text x="44" y="222" font-size="11" fill="#0f172a">Cancel reservation</text>
+<text x="44" y="236" font-size="9.5" fill="#94a3b8">TM3</text>
+<rect x="32" y="254" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="254" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="272" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-21</text>
+<text x="44" y="288" font-size="11" fill="#0f172a">Reservation history page</text>
+<text x="44" y="302" font-size="9.5" fill="#94a3b8">TM4</text>
+<rect x="32" y="320" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="320" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="338" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-22</text>
+<text x="44" y="354" font-size="11" fill="#0f172a">History empty/error states</text>
+<text x="44" y="368" font-size="9.5" fill="#94a3b8">TM4</text>
+<rect x="32" y="386" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="386" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="404" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-23</text>
+<text x="44" y="420" font-size="11" fill="#0f172a">AI service skeleton</text>
+<text x="44" y="434" font-size="9.5" fill="#94a3b8">TM5</text>
+<rect x="32" y="452" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="452" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="470" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-24</text>
+<text x="44" y="486" font-size="11" fill="#0f172a">AI-disabled regression test ★</text>
+<text x="44" y="500" font-size="9.5" fill="#94a3b8">TM5</text>
+<rect x="32" y="518" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="518" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="536" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-25</text>
+<text x="44" y="552" font-size="11" fill="#0f172a">AI triage on reservation</text>
+<text x="44" y="566" font-size="9.5" fill="#94a3b8">TM5</text>
+<rect x="32" y="584" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="584" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="602" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-26</text>
+<text x="44" y="618" font-size="11" fill="#0f172a">Trip embeddings &amp; semantic search</text>
+<text x="44" y="632" font-size="9.5" fill="#94a3b8">TM5</text>
+<rect x="32" y="650" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="650" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="668" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-27</text>
+<text x="44" y="684" font-size="11" fill="#0f172a">Assistant search UI</text>
+<text x="44" y="698" font-size="9.5" fill="#94a3b8">TM3</text>
+<rect x="32" y="716" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="716" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="734" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-28</text>
+<text x="44" y="750" font-size="11" fill="#0f172a">Passenger list endpoint</text>
+<text x="44" y="764" font-size="9.5" fill="#94a3b8">TM2</text>
+<rect x="32" y="782" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="32" y="782" width="4" height="56" fill="#64748b" rx="2"/>
+<text x="44" y="800" font-size="10" font-weight="bold" fill="#64748b">SAHYOG-29</text>
+<text x="44" y="816" font-size="11" fill="#0f172a">Passenger list &amp; my-trips UI</text>
+<text x="44" y="830" font-size="9.5" fill="#94a3b8">TM4</text>
+<rect x="344" y="66" width="300" height="204" rx="8" fill="#fffbeb" stroke="#cbd5e1" stroke-width="1"/>
+<rect x="344" y="66" width="300" height="6" fill="#b45309" rx="3"/>
+<text x="360" y="96" font-size="13.5" font-weight="bold" fill="#b45309">In Progress</text>
+<circle cx="620" cy="91" r="12" fill="#b45309"/>
+<text x="620" y="95" font-size="11" font-weight="bold" fill="white" text-anchor="middle">2</text>
+<rect x="356" y="122" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="356" y="122" width="4" height="56" fill="#b45309" rx="2"/>
+<text x="368" y="140" font-size="10" font-weight="bold" fill="#b45309">SAHYOG-17</text>
+<text x="368" y="156" font-size="11" fill="#0f172a">Confirm reservation</text>
+<text x="368" y="170" font-size="9.5" fill="#94a3b8">TM2</text>
+<rect x="356" y="188" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="356" y="188" width="4" height="56" fill="#b45309" rx="2"/>
+<text x="368" y="206" font-size="10" font-weight="bold" fill="#b45309">SAHYOG-18</text>
+<text x="368" y="222" font-size="11" fill="#0f172a">Hold expiry sweep</text>
+<text x="368" y="236" font-size="9.5" fill="#94a3b8">TM1</text>
+<rect x="668" y="66" width="300" height="666" rx="8" fill="#f0fdf4" stroke="#cbd5e1" stroke-width="1"/>
+<rect x="668" y="66" width="300" height="6" fill="#15803d" rx="3"/>
+<text x="684" y="96" font-size="13.5" font-weight="bold" fill="#15803d">Done</text>
+<circle cx="944" cy="91" r="12" fill="#15803d"/>
+<text x="944" y="95" font-size="11" font-weight="bold" fill="white" text-anchor="middle">9</text>
+<rect x="680" y="122" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="680" y="122" width="4" height="56" fill="#15803d" rx="2"/>
+<text x="692" y="140" font-size="10" font-weight="bold" fill="#15803d">SAHYOG-01</text>
+<text x="692" y="156" font-size="11" fill="#0f172a">Repo scaffolding</text>
+<text x="692" y="170" font-size="9.5" fill="#94a3b8">TM1/TM2</text>
+<rect x="680" y="188" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="680" y="188" width="4" height="56" fill="#15803d" rx="2"/>
+<text x="692" y="206" font-size="10" font-weight="bold" fill="#15803d">SAHYOG-02</text>
+<text x="692" y="222" font-size="11" fill="#0f172a">DB schema &amp; migrations</text>
+<text x="692" y="236" font-size="9.5" fill="#94a3b8">TM2</text>
+<rect x="680" y="254" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="680" y="254" width="4" height="56" fill="#15803d" rx="2"/>
+<text x="692" y="272" font-size="10" font-weight="bold" fill="#15803d">SAHYOG-03</text>
+<text x="692" y="288" font-size="11" fill="#0f172a">API contract &amp; error envelope</text>
+<text x="692" y="302" font-size="9.5" fill="#94a3b8">TM1</text>
+<rect x="680" y="320" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="680" y="320" width="4" height="56" fill="#15803d" rx="2"/>
+<text x="692" y="338" font-size="10" font-weight="bold" fill="#15803d">SAHYOG-04</text>
+<text x="692" y="354" font-size="11" fill="#0f172a">Register &amp; login</text>
+<text x="692" y="368" font-size="9.5" fill="#94a3b8">TM1</text>
+<rect x="680" y="386" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="680" y="386" width="4" height="56" fill="#15803d" rx="2"/>
+<text x="692" y="404" font-size="10" font-weight="bold" fill="#15803d">SAHYOG-05</text>
+<text x="692" y="420" font-size="11" fill="#0f172a">Coordinator: create trip</text>
+<text x="692" y="434" font-size="9.5" fill="#94a3b8">TM2</text>
+<rect x="680" y="452" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="680" y="452" width="4" height="56" fill="#15803d" rx="2"/>
+<text x="692" y="470" font-size="10" font-weight="bold" fill="#15803d">SAHYOG-06</text>
+<text x="692" y="486" font-size="11" fill="#0f172a">Rider: search trips</text>
+<text x="692" y="500" font-size="9.5" fill="#94a3b8">TM3</text>
+<rect x="680" y="518" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="680" y="518" width="4" height="56" fill="#15803d" rx="2"/>
+<text x="692" y="536" font-size="10" font-weight="bold" fill="#15803d">SAHYOG-07</text>
+<text x="692" y="552" font-size="11" fill="#0f172a">Trip detail &amp; seat map</text>
+<text x="692" y="566" font-size="9.5" fill="#94a3b8">TM4</text>
+<rect x="680" y="584" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="680" y="584" width="4" height="56" fill="#15803d" rx="2"/>
+<text x="692" y="602" font-size="10" font-weight="bold" fill="#15803d">SAHYOG-15</text>
+<text x="692" y="618" font-size="11" fill="#0f172a">hold_seat() row locking</text>
+<text x="692" y="632" font-size="9.5" fill="#94a3b8">TM2</text>
+<rect x="680" y="650" width="276" height="56" rx="6" fill="white" stroke="#e2e8f0" stroke-width="1"/>
+<rect x="680" y="650" width="4" height="56" fill="#15803d" rx="2"/>
+<text x="692" y="668" font-size="10" font-weight="bold" fill="#15803d">SAHYOG-16</text>
+<text x="692" y="684" font-size="11" fill="#0f172a">Hold endpoint + hold UI</text>
+<text x="692" y="698" font-size="9.5" fill="#94a3b8">TM1</text>
+</svg>

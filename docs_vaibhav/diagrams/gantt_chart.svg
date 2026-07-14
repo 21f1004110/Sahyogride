@@ -1,0 +1,78 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1106" height="450" viewBox="0 0 1106 450" font-family="Helvetica, Arial, sans-serif">
+<rect width="1106" height="450" fill="#ffffff"/>
+<text x="20" y="26" font-size="18" font-weight="bold" fill="#0f172a">SahyogRide — Gantt Chart</text>
+<text x="20" y="44" font-size="11" fill="#64748b">11 Jul – 22 Jul 2026 · Sprint 1: 11–16 Jul · Sprint 2: 17–22 Jul</text>
+<line x1="260" y1="76" x2="260" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="294.0" y="70" font-size="10" fill="#334155" text-anchor="middle">11 Jul</text>
+<text x="294.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Sat</text>
+<line x1="328" y1="76" x2="328" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="362.0" y="70" font-size="10" fill="#334155" text-anchor="middle">12 Jul</text>
+<text x="362.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Sun</text>
+<line x1="396" y1="76" x2="396" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="430.0" y="70" font-size="10" fill="#334155" text-anchor="middle">13 Jul</text>
+<text x="430.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Mon</text>
+<line x1="464" y1="76" x2="464" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="498.0" y="70" font-size="10" fill="#334155" text-anchor="middle">14 Jul</text>
+<text x="498.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Tue</text>
+<line x1="532" y1="76" x2="532" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="566.0" y="70" font-size="10" fill="#334155" text-anchor="middle">15 Jul</text>
+<text x="566.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Wed</text>
+<line x1="600" y1="76" x2="600" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="634.0" y="70" font-size="10" fill="#334155" text-anchor="middle">16 Jul</text>
+<text x="634.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Thu</text>
+<line x1="668" y1="76" x2="668" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="702.0" y="70" font-size="10" fill="#334155" text-anchor="middle">17 Jul</text>
+<text x="702.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Fri</text>
+<line x1="736" y1="76" x2="736" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="770.0" y="70" font-size="10" fill="#334155" text-anchor="middle">18 Jul</text>
+<text x="770.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Sat</text>
+<line x1="804" y1="76" x2="804" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="838.0" y="70" font-size="10" fill="#334155" text-anchor="middle">19 Jul</text>
+<text x="838.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Sun</text>
+<line x1="872" y1="76" x2="872" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="906.0" y="70" font-size="10" fill="#334155" text-anchor="middle">20 Jul</text>
+<text x="906.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Mon</text>
+<line x1="940" y1="76" x2="940" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="974.0" y="70" font-size="10" fill="#334155" text-anchor="middle">21 Jul</text>
+<text x="974.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Tue</text>
+<line x1="1008" y1="76" x2="1008" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<text x="1042.0" y="70" font-size="10" fill="#334155" text-anchor="middle">22 Jul</text>
+<text x="1042.0" y="82" font-size="8.5" fill="#94a3b8" text-anchor="middle">Wed</text>
+<line x1="1076" y1="76" x2="1076" y2="390" stroke="#e2e8f0" stroke-width="1"/>
+<line x1="668" y1="76" x2="668" y2="390" stroke="#f59e0b" stroke-width="2" stroke-dasharray="4,3"/>
+<text x="672" y="66" font-size="9.5" fill="#b45309">Sprint boundary</text>
+<line x1="396" y1="76" x2="396" y2="390" stroke="#dc2626" stroke-width="2"/>
+<text x="400" y="442" font-size="9.5" fill="#dc2626">Today (13 Jul 2026)</text>
+<rect x="260" y="90" width="816" height="30" fill="#f8fafc"/>
+<text x="10" y="109.0" font-size="11" fill="#0f172a">Phase 0 — Foundation</text>
+<text x="240" y="109.0" font-size="9.5" fill="#94a3b8" text-anchor="end">01–03</text>
+<rect x="264" y="96" width="60" height="18" rx="4" fill="#0f766e"/>
+<text x="10" y="139.0" font-size="11" fill="#0f172a">Env / Postgres+pgvector setup</text>
+<text x="240" y="139.0" font-size="9.5" fill="#94a3b8" text-anchor="end">buffer</text>
+<rect x="332" y="126" width="60" height="18" rx="4" fill="#94a3b8"/>
+<rect x="260" y="150" width="816" height="30" fill="#f8fafc"/>
+<text x="10" y="169.0" font-size="11" fill="#0f172a">Phase 1 — Auth &amp; Trips</text>
+<text x="240" y="169.0" font-size="9.5" fill="#94a3b8" text-anchor="end">04–07</text>
+<rect x="400" y="156" width="60" height="18" rx="4" fill="#0369a1"/>
+<text x="10" y="199.0" font-size="11" fill="#0f172a">Phase 2 — Core booking</text>
+<text x="240" y="199.0" font-size="9.5" fill="#94a3b8" text-anchor="end">15–19</text>
+<rect x="400" y="186" width="196" height="18" rx="4" fill="#b91c1c"/>
+<rect x="260" y="210" width="816" height="30" fill="#f8fafc"/>
+<text x="10" y="229.0" font-size="11" fill="#0f172a">Phase 3 — Cancellation &amp; history</text>
+<text x="240" y="229.0" font-size="9.5" fill="#94a3b8" text-anchor="end">20–22</text>
+<rect x="604" y="216" width="60" height="18" rx="4" fill="#0369a1"/>
+<text x="10" y="259.0" font-size="11" fill="#0f172a">Sprint 1 Review &amp; Retro</text>
+<rect x="604" y="246" width="60" height="18" rx="4" fill="#334155"/>
+<rect x="260" y="270" width="816" height="30" fill="#f8fafc"/>
+<text x="10" y="289.0" font-size="11" fill="#0f172a">Phase 4 — AI features</text>
+<text x="240" y="289.0" font-size="9.5" fill="#94a3b8" text-anchor="end">23–27</text>
+<rect x="672" y="276" width="264" height="18" rx="4" fill="#7c3aed"/>
+<text x="10" y="319.0" font-size="11" fill="#0f172a">Phase 5 — Passenger list</text>
+<text x="240" y="319.0" font-size="9.5" fill="#94a3b8" text-anchor="end">28–29</text>
+<rect x="876" y="306" width="128" height="18" rx="4" fill="#0369a1"/>
+<rect x="260" y="330" width="816" height="30" fill="#f8fafc"/>
+<text x="10" y="349.0" font-size="11" fill="#0f172a">Final QA, deploy, demo prep</text>
+<rect x="1012" y="336" width="60" height="18" rx="4" fill="#334155"/>
+<text x="10" y="379.0" font-size="11" fill="#0f172a">Sprint 2 Review &amp; Retro / Submission</text>
+<rect x="1012" y="366" width="60" height="18" rx="4" fill="#334155"/>
+</svg>
