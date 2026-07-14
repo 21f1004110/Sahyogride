@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   CalendarDaysIcon,
   CheckBadgeIcon,
@@ -21,6 +22,7 @@ const TIPS = [
 ];
 
 export default function CreateTrip() {
+  const reduceMotion = useReducedMotion();
   const [origin, setOrigin] = useState("");
   const [destination, setDestination] = useState("");
   const [departureTime, setDepartureTime] = useState("");
@@ -59,23 +61,47 @@ export default function CreateTrip() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
-      <div className="flex items-center gap-3 mb-8">
-        <span className="w-11 h-11 rounded-full bg-primary-100 text-primary-700 flex items-center justify-center">
-          <PlusCircleIcon className="w-6 h-6" aria-hidden="true" />
-        </span>
+      <motion.div
+        initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="flex items-center gap-3 mb-8"
+      >
+        <motion.span
+          whileHover={reduceMotion ? {} : { scale: 1.08, rotate: -4 }}
+          transition={{ type: "spring", stiffness: 300, damping: 15 }}
+          className="icon-badge bg-gradient-to-br from-primary-500 to-primary-700"
+        >
+          <PlusCircleIcon className="w-6 h-6 relative" aria-hidden="true" />
+        </motion.span>
         <div>
           <h1 className="font-heading text-3xl font-bold text-gray-900">Create a trip</h1>
           <p className="text-sm text-gray-600">Publish a free shuttle trip for riders to find and book.</p>
         </div>
-      </div>
+      </motion.div>
 
       <div className="grid gap-8 lg:grid-cols-2 items-start">
-        <form onSubmit={handleSubmit} className="card p-6 space-y-4">
-          {created && (
-            <p role="status" className="rounded-xl bg-green-50 text-green-800 px-3 py-2 text-sm">
-              Trip #{created.id} created with {created.total_seats} seats.
-            </p>
-          )}
+        <motion.form
+          initial={reduceMotion ? false : { opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.1, ease: "easeOut" }}
+          onSubmit={handleSubmit}
+          className="card p-6 space-y-4"
+        >
+          <AnimatePresence>
+            {created && (
+              <motion.p
+                key="created"
+                initial={reduceMotion ? false : { opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={reduceMotion ? {} : { opacity: 0, height: 0 }}
+                role="status"
+                className="rounded-xl bg-green-50 text-green-800 px-3 py-2 text-sm overflow-hidden"
+              >
+                Trip #{created.id} created with {created.total_seats} seats.
+              </motion.p>
+            )}
+          </AnimatePresence>
           {error && <ErrorState message={error} />}
 
           <div>
@@ -170,38 +196,59 @@ export default function CreateTrip() {
           <button type="submit" disabled={loading} className="btn-primary w-full">
             {loading ? "Creating…" : "Create trip"}
           </button>
-        </form>
+        </motion.form>
 
-        <div className="space-y-6">
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+          className="space-y-6"
+        >
           <div>
             <h2 className="font-heading font-semibold text-gray-900 mb-3">Preview</h2>
-            {hasPreview ? (
-              <div className="card p-5">
-                <p className="font-heading font-semibold text-gray-900 text-lg mb-3">
-                  {origin || "Origin"} &rarr; {destination || "Destination"}
-                </p>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <p className="flex items-center gap-2">
-                    <ClockIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
-                    {departureTime ? new Date(departureTime).toLocaleString() : "Departure time"}
+            <AnimatePresence mode="wait">
+              {hasPreview ? (
+                <motion.div
+                  key="preview"
+                  initial={reduceMotion ? false : { opacity: 0, scale: 0.97 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={reduceMotion ? {} : { opacity: 0, scale: 0.97 }}
+                  transition={{ duration: 0.25, ease: "easeOut" }}
+                  className="card p-5"
+                >
+                  <p className="font-heading font-semibold text-gray-900 text-lg mb-3">
+                    {origin || "Origin"} &rarr; {destination || "Destination"}
                   </p>
-                  {purpose && (
+                  <div className="space-y-2 text-sm text-gray-600">
                     <p className="flex items-center gap-2">
-                      <TagIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
-                      {purpose}
+                      <ClockIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
+                      {departureTime ? new Date(departureTime).toLocaleString() : "Departure time"}
                     </p>
-                  )}
-                  <p className="flex items-center gap-2">
-                    <UsersIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
-                    {totalSeats || 0} seats will be created
-                  </p>
-                </div>
-              </div>
-            ) : (
-              <div className="card p-5 text-sm text-gray-500">
-                Start filling in the form to see how your trip will look to riders.
-              </div>
-            )}
+                    {purpose && (
+                      <p className="flex items-center gap-2">
+                        <TagIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
+                        {purpose}
+                      </p>
+                    )}
+                    <p className="flex items-center gap-2">
+                      <UsersIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
+                      {totalSeats || 0} seats will be created
+                    </p>
+                  </div>
+                </motion.div>
+              ) : (
+                <motion.div
+                  key="empty"
+                  initial={reduceMotion ? false : { opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={reduceMotion ? {} : { opacity: 0 }}
+                  transition={{ duration: 0.25 }}
+                  className="card p-5 text-sm text-gray-500"
+                >
+                  Start filling in the form to see how your trip will look to riders.
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           <div className="card p-5">
@@ -210,15 +257,21 @@ export default function CreateTrip() {
               Good to know
             </h2>
             <ul className="space-y-2">
-              {TIPS.map((tip) => (
-                <li key={tip} className="flex items-start gap-2 text-sm text-gray-600">
+              {TIPS.map((tip, i) => (
+                <motion.li
+                  key={tip}
+                  initial={reduceMotion ? false : { opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: reduceMotion ? 0 : 0.3 + i * 0.08, ease: "easeOut" }}
+                  className="flex items-start gap-2 text-sm text-gray-600"
+                >
                   <CheckBadgeIcon className="w-4 h-4 text-primary-500 mt-0.5 shrink-0" aria-hidden="true" />
                   {tip}
-                </li>
+                </motion.li>
               ))}
             </ul>
           </div>
-        </div>
+        </motion.div>
       </div>
     </div>
   );

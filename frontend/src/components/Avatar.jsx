@@ -15,11 +15,12 @@ function initials(name) {
     .toUpperCase();
 }
 
-export default function Avatar({ name, index = 0 }) {
+export default function Avatar({ name, index = 0, small = false }) {
+  const size = small ? "w-8 h-8 text-xs" : "w-12 h-12";
   return (
     <div
       aria-hidden="true"
-      className={`w-12 h-12 shrink-0 rounded-full flex items-center justify-center font-heading font-bold ${PALETTE[index % PALETTE.length]}`}
+      className={`${size} shrink-0 rounded-full flex items-center justify-center font-heading font-bold ring-2 ring-white/60 ${PALETTE[index % PALETTE.length]}`}
     >
       {initials(name)}
     </div>

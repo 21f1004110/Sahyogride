@@ -11,11 +11,20 @@
   h3 {
     @apply font-heading;
   }
+  section[id] {
+    scroll-margin-top: 5rem;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  html {
+    scroll-behavior: smooth;
+  }
 }
 
 @layer components {
   .btn-primary {
-    @apply inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-medium text-white
+    @apply relative overflow-hidden inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-medium text-white
       bg-gradient-to-r from-primary-600 to-brand-600
       hover:from-primary-700 hover:to-brand-700
       hover:scale-[1.03] active:scale-[0.97]
@@ -23,12 +32,64 @@
       transition;
   }
 
+  .btn-primary::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(115deg, transparent 30%, rgba(255, 255, 255, 0.35) 45%, transparent 60%);
+    transform: translateX(-120%);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .btn-primary:hover::before {
+      transform: translateX(120%);
+      transition: transform 0.7s ease;
+    }
+  }
+
   .btn-secondary {
-    @apply inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-medium
+    @apply relative overflow-hidden inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-medium
       border border-gray-300 text-gray-700 bg-white hover:bg-gray-50
       hover:scale-[1.03] active:scale-[0.97]
       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
       transition;
+  }
+
+  .ripple {
+    position: absolute;
+    border-radius: 9999px;
+    background: rgba(255, 255, 255, 0.5);
+    transform: scale(0);
+    pointer-events: none;
+  }
+
+  .ripple--dark {
+    background: rgba(17, 24, 39, 0.08);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .ripple {
+      animation: ripple-expand 550ms ease-out;
+    }
+  }
+
+  @keyframes ripple-expand {
+    to {
+      transform: scale(1);
+      opacity: 0;
+    }
+  }
+
+  .magnetic {
+    --mx: 0px;
+    --my: 0px;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .magnetic {
+      transform: translate(var(--mx), var(--my));
+      transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    }
   }
 
   .input-field {
@@ -52,8 +113,116 @@
     @apply rounded-2xl border border-gray-200 bg-white shadow-sm;
   }
 
+  .glass-card {
+    @apply rounded-2xl border border-white/60 shadow-xl backdrop-blur-xl;
+    background: linear-gradient(160deg, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0.55));
+  }
+
   .brand-wordmark {
     @apply font-heading font-extrabold bg-gradient-to-r from-primary-600 to-brand-600 bg-clip-text text-transparent;
+  }
+
+  .gradient-text-animated {
+    @apply font-heading font-extrabold bg-clip-text text-transparent;
+    background-image: linear-gradient(
+      90deg,
+      theme("colors.primary.600"),
+      theme("colors.brand.600"),
+      theme("colors.primary.500"),
+      theme("colors.brand.600")
+    );
+    background-size: 300% 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .gradient-text-animated {
+      animation: gradient-pan 6s ease-in-out infinite;
+    }
+  }
+
+  .hero-spotlight {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    background: radial-gradient(
+      420px circle at var(--x, 50%) var(--y, 50%),
+      rgba(124, 58, 237, 0.14),
+      transparent 70%
+    );
+  }
+
+  .hero-spotlight-visible {
+    opacity: 1;
+  }
+
+  .icon-badge {
+    @apply relative w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg shrink-0 overflow-hidden;
+  }
+
+  .icon-badge::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.35), transparent 60%);
+    pointer-events: none;
+  }
+
+  .icon-badge-on-color {
+    @apply relative w-12 h-12 rounded-2xl flex items-center justify-center text-white shrink-0;
+    background: rgba(0, 0, 0, 0.22);
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.2), 0 2px 6px rgba(0, 0, 0, 0.12);
+  }
+
+  .nav-link {
+    @apply relative min-h-[44px] px-1 inline-flex items-center text-gray-600 font-medium text-sm
+      hover:text-gray-900 transition-colors;
+  }
+
+  .nav-link::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 2px;
+    height: 2px;
+    border-radius: 9999px;
+    background: linear-gradient(90deg, theme("colors.primary.500"), theme("colors.brand.500"));
+    transform: scaleX(0);
+    transform-origin: left;
+    transition: transform 200ms ease;
+  }
+
+  .nav-link:hover::after {
+    transform: scaleX(1);
+  }
+
+  .nav-link-active {
+    @apply text-gray-900;
+  }
+
+  .nav-link-active::after {
+    transform: scaleX(1);
+  }
+
+  .skeleton {
+    @apply relative overflow-hidden rounded-xl bg-gray-100;
+  }
+
+  .skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.75), transparent);
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .skeleton::after {
+      animation: skeleton-shimmer 1.6s ease-in-out infinite;
+    }
   }
 }
 
@@ -89,10 +258,184 @@
   .marquee-track:hover {
     animation-play-state: paused;
   }
+
+  @keyframes skeleton-shimmer {
+    100% { transform: translateX(100%); }
+  }
+
+  @keyframes gradient-pan {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+
+  @keyframes float-y {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-10px); }
+  }
+
+  .float-loop {
+    animation: float-y 5s ease-in-out infinite;
+  }
+}
+
+/* Fireworks: structural styles are unconditional so the graphic is always
+   visible; only the looping animation is gated by motion preference below. */
+.fireworks {
+  --anim-dur: 0ms;
+  --ease-out-cubic: cubic-bezier(0.33, 1, 0.68, 1);
+  --ease-out-sine: cubic-bezier(0.61, 1, 0.88, 1);
+  display: block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .fireworks__particle,
+  .fireworks__ring,
+  .fireworks__rocket {
+    animation-duration: var(--anim-dur);
+    animation-timing-function: linear;
+    animation-iteration-count: infinite;
+  }
+
+  .fireworks__particle--dashed {
+    animation-name: dashed-rotate-ccw, dashed-explode;
+    animation-timing-function: linear, var(--ease-out-cubic);
+  }
+
+  .fireworks__particle--dot {
+    animation-name: dot-scale;
+    animation-timing-function: var(--ease-out-cubic);
+  }
+
+  .fireworks__particle--ray {
+    animation-name: ray;
+  }
+
+  .fireworks__particle--ray-flip {
+    animation-name: ray-fade, ray-flip;
+  }
+
+  .fireworks__particle--quick-ray {
+    animation-name: quick-ray;
+  }
+
+  .fireworks__particle--quick-ray-flip {
+    animation-name: quick-ray-fade, quick-ray-flip;
+  }
+
+  .fireworks__ring--cw,
+  .fireworks__ring--ccw {
+    animation-timing-function: var(--ease-out-cubic);
+  }
+
+  .fireworks__ring--cw {
+    animation-name: ring-rotate-cw;
+  }
+
+  .fireworks__ring--ccw {
+    animation-name: ring-rotate-ccw;
+  }
+
+  .fireworks__rocket {
+    animation-name: rocket-fade, rocket-fire;
+    animation-timing-function: linear, var(--ease-out-sine);
+  }
+
+  @keyframes dashed-explode {
+    from, 25% { transform: scale(0); }
+    to { stroke-width: 0; transform: scale(2); }
+  }
+
+  @keyframes dashed-rotate-ccw {
+    from, 25% { transform: rotate(0); visibility: visible; }
+    to { transform: rotate(-22.5deg); visibility: hidden; }
+  }
+
+  @keyframes dot-scale {
+    from, 25% { transform: scale(1); }
+    to { transform: scale(0); }
+  }
+
+  @keyframes ring-rotate-cw {
+    from, 25% { transform: scale(0) rotate(0); }
+    to { transform: scale(1) rotate(22.5deg); }
+  }
+
+  @keyframes ring-rotate-ccw {
+    from, 25% { transform: scale(0) rotate(0); }
+    to { transform: scale(1) rotate(-22.5deg); }
+  }
+
+  @keyframes ray {
+    from, 25% { transform: scale(1, 0); visibility: visible; }
+    40%, to { transform: scale(1, 1); visibility: hidden; }
+  }
+
+  @keyframes ray-fade {
+    from, 50% { opacity: 1; }
+    55%, to { opacity: 0; }
+  }
+
+  @keyframes ray-flip {
+    from, 40% { transform: scale(1, 1); visibility: hidden; }
+    55%, to { transform: scale(1, 0); visibility: visible; }
+  }
+
+  @keyframes quick-ray {
+    from, 32.5% { transform: scale(1, 0); visibility: visible; }
+    42.5%, to { transform: scale(1, 1); visibility: hidden; }
+  }
+
+  @keyframes quick-ray-fade {
+    from, 50% { opacity: 1; }
+    52.5%, to { opacity: 0; }
+  }
+
+  @keyframes quick-ray-flip {
+    from, 42.5% { transform: scale(1, 1); visibility: hidden; }
+    52.5%, to { transform: scale(1, 0); visibility: visible; }
+  }
+
+  @keyframes rocket-fade {
+    from, 25% { opacity: 1; }
+    35%, to { opacity: 0; }
+  }
+
+  @keyframes rocket-fire {
+    25%, to { stroke-dashoffset: 0; }
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .marquee-track {
     animation: none;
+  }
+
+  /* Freeze fireworks at a "burst" frame instead of hiding them. */
+  .fireworks__rocket {
+    display: none;
+  }
+
+  .fireworks__ring--cw,
+  .fireworks__ring--ccw {
+    transform: scale(1) rotate(0);
+  }
+
+  .fireworks__particle--dot {
+    transform: scale(1);
+  }
+
+  .fireworks__particle--ray,
+  .fireworks__particle--quick-ray {
+    transform: scale(1, 1);
+    visibility: visible;
+  }
+
+  .fireworks__particle--ray-flip,
+  .fireworks__particle--quick-ray-flip {
+    visibility: hidden;
+  }
+
+  .fireworks__particle--dashed {
+    transform: scale(1.4);
   }
 }

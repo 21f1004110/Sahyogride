@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { motion, useReducedMotion } from "framer-motion";
 import { EnvelopeIcon, LockClosedIcon, UserIcon, UserPlusIcon } from "@heroicons/react/24/outline";
 
 import { useAuth } from "../context/AuthContext";
@@ -9,6 +10,7 @@ import ErrorState from "../components/states/ErrorState";
 export default function Register() {
   const { register } = useAuth();
   const navigate = useNavigate();
+  const reduceMotion = useReducedMotion();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -30,26 +32,56 @@ export default function Register() {
     }
   }
 
+  const container = {
+    hidden: {},
+    show: { transition: { staggerChildren: reduceMotion ? 0 : 0.08, delayChildren: 0.05 } },
+  };
+  const item = reduceMotion
+    ? { hidden: { opacity: 1 }, show: { opacity: 1 } }
+    : {
+        hidden: { opacity: 0, y: 14 },
+        show: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } },
+      };
+
   return (
     <div className="min-h-screen relative flex items-center justify-center px-4 py-10">
       <BackgroundBlobs />
 
-      <div className="w-full max-w-sm">
+      <motion.div
+        initial={reduceMotion ? false : { opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.5, ease: "easeOut" }}
+        className="w-full max-w-sm"
+      >
         <Link to="/" className="brand-wordmark text-xl block text-center mb-6">
           SahyogRide
         </Link>
 
-        <form onSubmit={handleSubmit} className="card p-6 space-y-4">
-          <div className="flex flex-col items-center text-center gap-2 mb-2">
-            <span className="w-12 h-12 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center">
-              <UserPlusIcon className="w-6 h-6" aria-hidden="true" />
-            </span>
+        <motion.form
+          variants={container}
+          initial="hidden"
+          animate="show"
+          onSubmit={handleSubmit}
+          className="card p-6 space-y-4"
+        >
+          <motion.div variants={item} className="flex flex-col items-center text-center gap-2 mb-2">
+            <motion.span
+              whileHover={reduceMotion ? {} : { scale: 1.08, rotate: 4 }}
+              transition={{ type: "spring", stiffness: 300, damping: 15 }}
+              className="icon-badge bg-gradient-to-br from-brand-500 to-brand-700"
+            >
+              <UserPlusIcon className="w-6 h-6 relative" aria-hidden="true" />
+            </motion.span>
             <h1 className="font-heading text-2xl font-bold text-gray-900">Create an account</h1>
-          </div>
+          </motion.div>
 
-          {error && <ErrorState message={error} />}
+          {error && (
+            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+              <ErrorState message={error} />
+            </motion.div>
+          )}
 
-          <div>
+          <motion.div variants={item}>
             <label htmlFor="name" className="field-label">
               Name
             </label>
@@ -64,9 +96,9 @@ export default function Register() {
                 className="input-field !mt-0 pl-10"
               />
             </div>
-          </div>
+          </motion.div>
 
-          <div>
+          <motion.div variants={item}>
             <label htmlFor="email" className="field-label">
               Email
             </label>
@@ -81,9 +113,9 @@ export default function Register() {
                 className="input-field !mt-0 pl-10"
               />
             </div>
-          </div>
+          </motion.div>
 
-          <div>
+          <motion.div variants={item}>
             <label htmlFor="password" className="field-label">
               Password
             </label>
@@ -99,60 +131,53 @@ export default function Register() {
                 className="input-field !mt-0 pl-10"
               />
             </div>
-          </div>
+          </motion.div>
 
-          <fieldset>
+          <motion.fieldset variants={item}>
             <legend className="field-label">I am a</legend>
             <div className="mt-2 flex gap-3">
-              <label
-                className={`flex-1 flex items-center justify-center gap-2 min-h-[44px] rounded-xl border px-3 cursor-pointer focus-within:ring-2 focus-within:ring-primary-500 ${
-                  role === "rider"
-                    ? "border-primary-500 bg-primary-50 text-primary-700"
-                    : "border-gray-300 text-gray-600"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="role"
-                  value="rider"
-                  checked={role === "rider"}
-                  onChange={() => setRole("rider")}
-                  className="sr-only"
-                />
-                Rider
-              </label>
-              <label
-                className={`flex-1 flex items-center justify-center gap-2 min-h-[44px] rounded-xl border px-3 cursor-pointer focus-within:ring-2 focus-within:ring-primary-500 ${
-                  role === "coordinator"
-                    ? "border-primary-500 bg-primary-50 text-primary-700"
-                    : "border-gray-300 text-gray-600"
-                }`}
-              >
-                <input
-                  type="radio"
-                  name="role"
-                  value="coordinator"
-                  checked={role === "coordinator"}
-                  onChange={() => setRole("coordinator")}
-                  className="sr-only"
-                />
-                Coordinator
-              </label>
+              {["rider", "coordinator"].map((option) => (
+                <label
+                  key={option}
+                  className={`relative flex-1 flex items-center justify-center gap-2 min-h-[44px] rounded-xl border px-3 cursor-pointer overflow-hidden focus-within:ring-2 focus-within:ring-primary-500 ${
+                    role === option ? "border-primary-500 text-primary-700" : "border-gray-300 text-gray-600"
+                  }`}
+                >
+                  {role === option && (
+                    <motion.span
+                      layoutId="role-highlight"
+                      transition={reduceMotion ? { duration: 0 } : { type: "spring", stiffness: 400, damping: 30 }}
+                      className="absolute inset-0 bg-primary-50"
+                    />
+                  )}
+                  <input
+                    type="radio"
+                    name="role"
+                    value={option}
+                    checked={role === option}
+                    onChange={() => setRole(option)}
+                    className="sr-only"
+                  />
+                  <span className="relative capitalize">{option}</span>
+                </label>
+              ))}
             </div>
-          </fieldset>
+          </motion.fieldset>
 
-          <button type="submit" disabled={loading} className="btn-primary w-full">
-            {loading ? "Creating account…" : "Register"}
-          </button>
+          <motion.div variants={item}>
+            <button type="submit" disabled={loading} className="btn-primary w-full">
+              {loading ? "Creating account…" : "Register"}
+            </button>
+          </motion.div>
 
-          <p className="text-sm text-center text-gray-600">
+          <motion.p variants={item} className="text-sm text-center text-gray-600">
             Already have an account?{" "}
             <Link to="/login" className="text-primary-600 font-medium hover:underline">
               Log in
             </Link>
-          </p>
-        </form>
-      </div>
+          </motion.p>
+        </motion.form>
+      </motion.div>
     </div>
   );
 }
