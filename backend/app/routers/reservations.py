@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -11,6 +11,7 @@ from app.schemas import (
     ReservationOut,
 )
 from app.services.booking import cancel_reservation, confirm_reservation, list_my_reservations
+from app.services.reservation_triage import run_reservation_triage
 
 router = APIRouter(prefix="/reservations", tags=["reservations"])
 
@@ -18,10 +19,15 @@ router = APIRouter(prefix="/reservations", tags=["reservations"])
 @router.post("", response_model=ReservationOut, status_code=status.HTTP_201_CREATED)
 def create_reservation_endpoint(
     body: ReservationCreateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     rider: User = Depends(require_role(UserRole.RIDER)),
 ) -> ReservationOut:
-    return confirm_reservation(db, body.hold_id, rider.id)
+    reservation = confirm_reservation(db, body.hold_id, rider.id)
+    # Fires after this request's response is sent, never inside the
+    # booking transaction above - CLAUDE.md rule #2.
+    background_tasks.add_task(run_reservation_triage, reservation.id, reservation.trip_id)
+    return reservation
 
 
 @router.get("/me", response_model=ReservationHistoryResponse)
