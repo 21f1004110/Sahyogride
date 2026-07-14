@@ -114,3 +114,18 @@ class HoldOut(BaseModel):
     expires_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ReservationCreateRequest(BaseModel):
+    hold_id: int
+
+
+class ReservationOut(BaseModel):
+    id: int
+    seat_id: int
+    trip_id: int
+    rider_id: int
+    status: str
+    confirmed_at: datetime
+
+    model_config = {"from_attributes": True}

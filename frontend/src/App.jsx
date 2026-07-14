@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 
 import { useAuth } from "./context/AuthContext";
 import Layout from "./components/Layout";
+import RippleFX from "./components/RippleFX";
 import Landing from "./pages/Landing";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
@@ -9,6 +10,7 @@ import Register from "./pages/Register";
 import CreateTrip from "./pages/CreateTrip";
 import SearchTrips from "./pages/SearchTrips";
 import TripDetail from "./pages/TripDetail";
+import Confirmation from "./pages/Confirmation";
 
 function RootRoute() {
   const { isAuthenticated } = useAuth();
@@ -41,49 +43,60 @@ function RedirectIfAuthenticated({ children }) {
 
 function App() {
   return (
-    <Routes>
-      <Route
-        path="/login"
-        element={
-          <RedirectIfAuthenticated>
-            <Login />
-          </RedirectIfAuthenticated>
-        }
-      />
-      <Route
-        path="/register"
-        element={
-          <RedirectIfAuthenticated>
-            <Register />
-          </RedirectIfAuthenticated>
-        }
-      />
-      <Route path="/" element={<RootRoute />} />
-      <Route
-        path="/trips"
-        element={
-          <RequireAuth>
-            <SearchTrips />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/trips/:id"
-        element={
-          <RequireAuth>
-            <TripDetail />
-          </RequireAuth>
-        }
-      />
-      <Route
-        path="/trips/new"
-        element={
-          <RequireCoordinator>
-            <CreateTrip />
-          </RequireCoordinator>
-        }
-      />
-    </Routes>
+    <>
+      <RippleFX />
+      <Routes>
+        <Route
+          path="/login"
+          element={
+            <RedirectIfAuthenticated>
+              <Login />
+            </RedirectIfAuthenticated>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <RedirectIfAuthenticated>
+              <Register />
+            </RedirectIfAuthenticated>
+          }
+        />
+        <Route path="/" element={<RootRoute />} />
+        <Route
+          path="/trips"
+          element={
+            <RequireAuth>
+              <SearchTrips />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/trips/:id"
+          element={
+            <RequireAuth>
+              <TripDetail />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/trips/new"
+          element={
+            <RequireCoordinator>
+              <CreateTrip />
+            </RequireCoordinator>
+          }
+        />
+        <Route
+          path="/confirmation"
+          element={
+            <RequireAuth>
+              <Confirmation />
+            </RequireAuth>
+          }
+        />
+      </Routes>
+    </>
   );
 }
 

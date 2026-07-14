@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.errors import AppError
-from app.models import Hold, Seat, SeatStatus
+from app.models import Hold, Reservation, Seat, SeatStatus
 
 
 def hold_seat(db: Session, seat_id: int, rider_id: int) -> Hold:
@@ -62,3 +62,38 @@ def release_hold(db: Session, hold_id: int, rider_id: int) -> None:
     if seat is not None and seat.status == SeatStatus.HELD:
         seat.status = SeatStatus.AVAILABLE
     db.commit()
+
+
+def confirm_reservation(db: Session, hold_id: int, rider_id: int) -> Reservation:
+    """Zero AI calls. Locking the hold row (rather than the seat) is what
+    serializes a double-confirm race: the loser's SELECT ... FOR UPDATE
+    blocks until the winner commits and deletes the row, so it then sees
+    NOT_FOUND. The partial unique index uq_reservations_seat_confirmed
+    (SAHYOG-02) is the third layer, a backstop against two *different*
+    holds ever producing two confirmed reservations for the same seat -
+    which the schema shouldn't allow (UNIQUE(seat_id) on holds) but the
+    index guarantees it at the database level regardless.
+    """
+    hold = db.query(Hold).filter(Hold.id == hold_id).with_for_update().first()
+    if hold is None:
+        raise AppError("NOT_FOUND")
+    if hold.rider_id != rider_id:
+        raise AppError("NOT_OWNER")
+    if hold.expires_at <= datetime.now(timezone.utc):
+        raise AppError("HOLD_EXPIRED")
+
+    seat = db.query(Seat).filter(Seat.id == hold.seat_id).with_for_update().first()
+    reservation = Reservation(seat_id=hold.seat_id, trip_id=hold.trip_id, rider_id=rider_id)
+    db.delete(hold)
+    if seat is not None:
+        seat.status = SeatStatus.RESERVED
+    db.add(reservation)
+
+    try:
+        db.commit()
+    except IntegrityError as exc:
+        db.rollback()
+        raise AppError("SEAT_UNAVAILABLE") from exc
+
+    db.refresh(reservation)
+    return reservation
