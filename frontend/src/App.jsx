@@ -11,6 +11,7 @@ import CreateTrip from "./pages/CreateTrip";
 import SearchTrips from "./pages/SearchTrips";
 import TripDetail from "./pages/TripDetail";
 import Confirmation from "./pages/Confirmation";
+import MyReservations from "./pages/MyReservations";
 
 function RootRoute() {
   const { isAuthenticated } = useAuth();
@@ -92,6 +93,14 @@ function App() {
           element={
             <RequireAuth>
               <Confirmation />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/reservations"
+          element={
+            <RequireAuth>
+              <MyReservations />
             </RequireAuth>
           }
         />

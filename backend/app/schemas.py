@@ -129,3 +129,24 @@ class ReservationOut(BaseModel):
     confirmed_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class ReservationCancelOut(BaseModel):
+    id: int
+    status: str
+    cancelled_at: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class ReservationHistoryItem(BaseModel):
+    id: int
+    trip_id: int
+    seat_number: str
+    status: str
+    confirmed_at: datetime
+    cancelled_at: datetime | None
+
+
+class ReservationHistoryResponse(BaseModel):
+    reservations: list[ReservationHistoryItem]

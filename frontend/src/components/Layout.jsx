@@ -1,6 +1,6 @@
 import { Link, useLocation } from "react-router-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { ArrowRightStartOnRectangleIcon, PlusIcon } from "@heroicons/react/24/outline";
+import { ArrowRightStartOnRectangleIcon, PlusIcon, TicketIcon } from "@heroicons/react/24/outline";
 import { MagnifyingGlassIcon } from "@heroicons/react/24/solid";
 
 import { useAuth } from "../context/AuthContext";
@@ -38,6 +38,12 @@ export default function Layout({ children }) {
                 <MagnifyingGlassIcon className="w-4 h-4 mr-1.5 hidden sm:inline" aria-hidden="true" />
                 Search trips
               </NavLink>
+              {user.role === "rider" && (
+                <NavLink to="/reservations">
+                  <TicketIcon className="w-4 h-4 mr-1.5 hidden sm:inline" aria-hidden="true" />
+                  My reservations
+                </NavLink>
+              )}
               {user.role === "coordinator" && (
                 <NavLink to="/trips/new">
                   <PlusIcon className="w-4 h-4 mr-1.5 hidden sm:inline" aria-hidden="true" />
