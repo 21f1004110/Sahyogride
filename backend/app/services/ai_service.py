@@ -91,3 +91,26 @@ def triage_reservation_urgency(purpose: str | None) -> ReservationTriageResult |
         return ReservationTriageResult.model_validate(raw)
 
     return _run_with_timeout(_call)
+
+
+EMBEDDING_MODEL = "text-embedding-3-small"
+
+
+def embed_text(text: str) -> list[float] | None:
+    """Embedding for a trip (SAHYOG-26, background task after trip commit)
+    or a search query (SAHYOG-27, AssistantBox). Dimension must match
+    EMBEDDING_DIM in models.py (1536).
+    """
+    client = _get_client()
+    if client is None or not text:
+        return None
+
+    def _call() -> list[float]:
+        response = client.embeddings.create(
+            model=EMBEDDING_MODEL,
+            input=text,
+            timeout=settings.ai_timeout_seconds,
+        )
+        return response.data[0].embedding
+
+    return _run_with_timeout(_call)

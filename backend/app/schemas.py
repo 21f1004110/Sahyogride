@@ -150,3 +150,21 @@ class ReservationHistoryItem(BaseModel):
 
 class ReservationHistoryResponse(BaseModel):
     reservations: list[ReservationHistoryItem]
+
+
+class AISearchRequest(BaseModel):
+    query: str = Field(min_length=1, max_length=500)
+
+
+class AISearchTripItem(BaseModel):
+    id: int
+    origin: str
+    destination: str
+    departure_time: datetime
+
+    model_config = {"from_attributes": True}
+
+
+class AISearchResponse(BaseModel):
+    trips: list[AISearchTripItem]
+    fallback: bool

@@ -1,12 +1,13 @@
 from datetime import date as date_type
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, status
 from sqlalchemy.orm import Session
 
 from app.database import get_db
 from app.deps import get_current_user, require_role
 from app.models import User, UserRole
 from app.schemas import TripCreateRequest, TripDetailOut, TripListItem, TripListResponse, TripOut
+from app.services.trip_embedding import run_trip_embedding
 from app.services.trip_service import create_trip, get_trip_detail, search_trips
 
 router = APIRouter(prefix="/trips", tags=["trips"])
@@ -15,10 +16,14 @@ router = APIRouter(prefix="/trips", tags=["trips"])
 @router.post("", response_model=TripOut, status_code=status.HTTP_201_CREATED)
 def create_trip_endpoint(
     body: TripCreateRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     coordinator: User = Depends(require_role(UserRole.COORDINATOR)),
 ) -> TripOut:
     trip = create_trip(db, coordinator, body)
+    # Fires after this request's response is sent, never inside the
+    # trip-creation transaction above - CLAUDE.md rule #2.
+    background_tasks.add_task(run_trip_embedding, trip.id)
     return trip
 
 

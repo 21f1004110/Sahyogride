@@ -35,4 +35,8 @@ class ReservationTriageResult(BaseModel):
 
 ## Trip embeddings & semantic search — SAHYOG-26
 
-Not yet implemented. Will embed `f"{origin} to {destination}: {purpose}"` via `text-embedding-3-small` as a background task after a trip commits, populating `trips.embedding` (nullable `Vector(1536)`). `POST /ai/search` will rank by cosine similarity above `SEMANTIC_THRESHOLD`, falling back to the plain keyword search from SAHYOG-06 when AI is off or the call fails.
+`embed_text(text: str) -> list[float] | None` (`ai_service.py`), model `text-embedding-3-small`, 1536 dimensions matching `EMBEDDING_DIM`/`trips.embedding` in `models.py`.
+
+**Embedding input** (`trip_embedding.embedding_text_for`): `f"{origin} to {destination}"`, plus `f": {purpose}"` when a purpose is set. Fires as a background task **after** `create_trip()` commits (`app/services/trip_embedding.py`) — never inside the trip-creation transaction. `backfill_embeddings.py` runs the same embedding for any existing trip where `embedding IS NULL` (safe to re-run).
+
+**`POST /ai/search`** (`app/services/ai_search.py`): embeds the query, then ranks trips by pgvector `cosine_distance` and keeps only those within `SEMANTIC_THRESHOLD` (`distance <= 1 - SEMANTIC_THRESHOLD`, since cosine distance = 1 − cosine similarity). Whenever `embed_text()` returns `None` — AI off, unconfigured, or the call fails — falls back to the plain keyword search from SAHYOG-06 and sets `"fallback": true`. A successful search that simply finds nothing above the threshold returns `"fallback": false` with an empty `trips` list; `fallback` means "AI didn't run," not "AI found nothing."
