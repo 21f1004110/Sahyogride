@@ -12,6 +12,7 @@ import {
 } from "@heroicons/react/24/outline";
 
 import { searchTrips } from "../api/trips";
+import AssistantBox from "../components/AssistantBox";
 import Empty from "../components/states/Empty";
 import ErrorState from "../components/states/ErrorState";
 import { TripListSkeleton } from "../components/states/Loading";
@@ -82,6 +83,15 @@ export default function SearchTrips() {
           <h1 className="font-heading text-3xl font-bold text-gray-900">Search trips</h1>
           <p className="text-sm text-gray-600">Find a free shuttle trip with an open seat.</p>
         </div>
+      </motion.div>
+
+      <motion.div
+        initial={reduceMotion ? false : { opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, delay: 0.05, ease: "easeOut" }}
+        className="mb-8"
+      >
+        <AssistantBox />
       </motion.div>
 
       <div className="grid gap-8 lg:grid-cols-[320px_1fr]">
