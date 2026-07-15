@@ -28,6 +28,9 @@ def create_trip(db: Session, coordinator: User, data: TripCreateRequest) -> Trip
     return trip
 
 
+MAX_SEARCH_RESULTS = 50
+
+
 def search_trips(
     db: Session,
     origin: str | None = None,
@@ -57,7 +60,7 @@ def search_trips(
             Trip.origin.ilike(pattern) | Trip.destination.ilike(pattern) | Trip.purpose.ilike(pattern)
         )
 
-    return query.order_by(Trip.departure_time).all()
+    return query.order_by(Trip.departure_time).limit(MAX_SEARCH_RESULTS).all()
 
 
 def get_trip_detail(db: Session, trip_id: int, rider_id: int) -> TripDetailOut:
