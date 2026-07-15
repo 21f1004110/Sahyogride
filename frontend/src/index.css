@@ -24,9 +24,9 @@
 
 @layer components {
   .btn-primary {
-    @apply relative overflow-hidden inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-medium text-white
-      bg-gradient-to-r from-primary-600 to-brand-600
-      hover:from-primary-700 hover:to-brand-700
+    @apply relative overflow-hidden inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-heading font-semibold text-white
+      bg-primary-600 shadow-lg shadow-primary-600/25
+      hover:bg-primary-700 hover:shadow-primary-600/35
       hover:scale-[1.03] active:scale-[0.97]
       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
       transition;
@@ -48,11 +48,35 @@
   }
 
   .btn-secondary {
-    @apply relative overflow-hidden inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-medium
-      border border-gray-300 text-gray-700 bg-white hover:bg-gray-50
+    @apply relative overflow-hidden inline-flex items-center justify-center min-h-[44px] px-5 rounded-xl font-heading font-semibold
+      border border-gray-200 text-gray-700 bg-white hover:bg-gray-50
       hover:scale-[1.03] active:scale-[0.97]
       disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100
       transition;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full capitalize bg-gray-100 text-gray-600;
+  }
+
+  .badge-green {
+    @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full capitalize bg-green-100 text-green-700;
+  }
+
+  .badge-purple {
+    @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full capitalize bg-primary-100 text-primary-700;
+  }
+
+  .badge-pink {
+    @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full capitalize bg-pink-100 text-pink-700;
+  }
+
+  .badge-amber {
+    @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full capitalize bg-amber-100 text-amber-700;
+  }
+
+  .badge-gray {
+    @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full capitalize bg-gray-100 text-gray-600;
   }
 
   .ripple {

@@ -37,9 +37,7 @@ export default function Dashboard() {
           </h1>
           <p className="mt-2 text-gray-600">
             You're signed in as a{" "}
-            <span className="inline-flex items-center rounded-full bg-primary-100 text-primary-700 px-2.5 py-0.5 text-xs font-semibold align-middle capitalize">
-              {user.role}
-            </span>
+            <span className="badge-purple align-middle">{user.role}</span>
           </p>
         </motion.div>
 

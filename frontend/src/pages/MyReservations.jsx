@@ -8,8 +8,8 @@ import ErrorState from "../components/states/ErrorState";
 import Loading from "../components/states/Loading";
 
 const STATUS_BADGE = {
-  confirmed: "bg-green-100 text-green-800",
-  cancelled: "bg-gray-200 text-gray-600",
+  confirmed: "badge-green",
+  cancelled: "badge-gray",
 };
 
 export default function MyReservations() {
@@ -75,11 +75,7 @@ export default function MyReservations() {
               </div>
 
               <div className="flex items-center gap-3 shrink-0">
-                <span
-                  className={`text-xs font-medium px-2.5 py-1 rounded-full capitalize ${STATUS_BADGE[r.status]}`}
-                >
-                  {r.status}
-                </span>
+                <span className={STATUS_BADGE[r.status]}>{r.status}</span>
                 {r.status === "confirmed" && (
                   <button
                     type="button"
