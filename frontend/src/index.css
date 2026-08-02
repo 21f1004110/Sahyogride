@@ -75,6 +75,45 @@
     @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full capitalize bg-amber-100 text-amber-700;
   }
 
+  .badge-red {
+    @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full capitalize bg-red-100 text-red-700;
+  }
+
+  @keyframes seat-pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 rgba(99, 102, 241, 0.45);
+    }
+    50% {
+      box-shadow: 0 0 0 6px rgba(99, 102, 241, 0);
+    }
+  }
+
+  .seat-pulse {
+    animation: seat-pulse 0.9s ease-out 1;
+  }
+
+  @keyframes seat-ripple {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    100% {
+      transform: scale(1.9);
+      opacity: 0;
+    }
+  }
+
+  .seat-pulse::after {
+    content: "";
+    position: absolute;
+    inset: -2px;
+    border-radius: inherit;
+    border: 2px solid rgb(99 102 241 / 0.6);
+    animation: seat-ripple 0.7s ease-out 1;
+    pointer-events: none;
+  }
+
   .badge-gray {
     @apply inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full capitalize bg-gray-100 text-gray-600;
   }

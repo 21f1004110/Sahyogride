@@ -7,6 +7,7 @@ import {
   ClockIcon,
   MagnifyingGlassIcon,
   MapPinIcon,
+  SparklesIcon,
   TagIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
@@ -204,11 +205,18 @@ export default function SearchTrips() {
                       to={`/trips/${trip.id}`}
                       className="card block p-5 h-full hover:shadow-md hover:-translate-y-0.5 transition"
                     >
-                      <p className="font-heading font-semibold text-gray-900 text-lg mb-3">
+                      <p className="font-heading font-semibold text-gray-900 text-lg mb-1">
                         {trip.origin} &rarr; {trip.destination}
                       </p>
 
-                      <div className="space-y-2 text-sm text-gray-600">
+                      {trip.ai_summary && (
+                        <p className="flex items-start gap-1.5 text-sm text-primary-700 mb-3">
+                          <SparklesIcon className="w-4 h-4 shrink-0 mt-0.5" aria-hidden="true" />
+                          <span>{trip.ai_summary}</span>
+                        </p>
+                      )}
+
+                      <div className="space-y-2 text-sm text-gray-600 mt-3">
                         <p className="flex items-center gap-2">
                           <ClockIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
                           {new Date(trip.departure_time).toLocaleString()}

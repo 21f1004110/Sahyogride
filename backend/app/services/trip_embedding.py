@@ -22,8 +22,13 @@ def run_trip_embedding(trip_id: int) -> None:
     """Runs as a FastAPI BackgroundTask, after the trip's own create
     request has already returned a response. Opens its own DB session
     rather than reusing the request's. Never raises - a failed or
-    disabled embedding just leaves trips.embedding null, and the trip
-    keeps working with plain keyword search (SAHYOG-06).
+    disabled embedding/summary just leaves the columns null, and the trip
+    keeps working with plain keyword search (SAHYOG-06) and no blurb
+    (SAHYOG-31).
+
+    Also generates the trip's ai_summary blurb here (SAHYOG-31) rather
+    than a second background task, since both are cheap, independent,
+    post-commit AI calls on the same freshly-created trip.
     """
     db = SessionLocal()
     try:
@@ -32,13 +37,17 @@ def run_trip_embedding(trip_id: int) -> None:
             return
 
         embedding = ai_service.embed_text(embedding_text_for(trip))
-        if embedding is None:
-            return
+        if embedding is not None:
+            trip.embedding = embedding
 
-        trip.embedding = embedding
-        db.commit()
+        summary = ai_service.summarize_trip(trip.origin, trip.destination, trip.purpose)
+        if summary is not None:
+            trip.ai_summary = summary
+
+        if embedding is not None or summary is not None:
+            db.commit()
     except Exception:
-        logger.exception("Trip embedding failed for trip_id=%s", trip_id)
+        logger.exception("Trip embedding/summary failed for trip_id=%s", trip_id)
         db.rollback()
     finally:
         db.close()

@@ -66,6 +66,12 @@ class Trip(Base):
     # task in SAHYOG-26. The app must work fully with these always null.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)
     ai_summary: Mapped[str | None] = mapped_column(String(500), nullable=True)
+    # Deterministic (not an LLM call - "is fill ratio over a threshold" is
+    # arithmetic, not a semantic judgment), set from the same post-commit
+    # background task as the AI columns above (SAHYOG-42). Never reset back
+    # to null/false once flagged. Nullable so "not yet evaluated" and
+    # "evaluated, not high demand" both read the same in the UI.
+    ai_high_demand: Mapped[bool | None] = mapped_column(nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -133,8 +139,16 @@ class Reservation(Base):
     confirmed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
+    # Rider-supplied, plain text - not AI. Written in the same transaction
+    # as the reservation itself (SAHYOG-40), same as Trip.purpose.
+    accessibility_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
     # AI columns - nullable by design, populated by a post-commit background
     # task in SAHYOG-25. The app must work fully with these always null.
     ai_urgency_label: Mapped[str | None] = mapped_column(String(50), nullable=True)
     ai_urgency_score: Mapped[float | None] = mapped_column(nullable=True)
     ai_triage_completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # Despite the plural name, this holds exactly one classified tag
+    # (SAHYOG-40) - matches the single-label ai_urgency_label precedent,
+    # kept as a plain string rather than a Postgres array type.
+    ai_accessibility_tags: Mapped[str | None] = mapped_column(String(50), nullable=True)

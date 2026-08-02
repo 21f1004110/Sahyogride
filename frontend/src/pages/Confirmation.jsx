@@ -1,18 +1,37 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
+import { useReducedMotion } from "framer-motion";
 import { CalendarDaysIcon, CheckCircleIcon, XCircleIcon } from "@heroicons/react/24/outline";
 
 import { cancelReservation } from "../api/booking";
 import Empty from "../components/states/Empty";
 import ErrorState from "../components/states/ErrorState";
+import StatusTimeline from "../components/StatusTimeline";
+import VehicleTracker from "../components/VehicleTracker";
+import Fireworks from "../components/Fireworks";
 
 export default function Confirmation() {
   const location = useLocation();
+  const reduceMotion = useReducedMotion();
   const { reservation, trip } = location.state || {};
   const [status, setStatus] = useState(reservation?.status);
   const [cancelledAt, setCancelledAt] = useState(reservation?.cancelled_at ?? null);
   const [cancelError, setCancelError] = useState(null);
+
+  // Celebrate the actual confirmed moment (SAHYOG-41), not the earlier
+  // provisional hold - fires once on mount, only for a freshly-confirmed
+  // (never a cancelled) reservation.
+  const [celebrating, setCelebrating] = useState(
+    () => !reduceMotion && reservation?.status === "confirmed",
+  );
+
+  useEffect(() => {
+    if (!celebrating) return;
+    const timeout = setTimeout(() => setCelebrating(false), 1500);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const cancelMutation = useMutation({
     mutationFn: () => cancelReservation(reservation.id),
@@ -41,7 +60,13 @@ export default function Confirmation() {
   const isCancelled = status === "cancelled";
 
   return (
-    <div className="max-w-md mx-auto px-4 py-16 text-center">
+    <div className="relative max-w-md mx-auto px-4 py-16 text-center">
+      {celebrating && (
+        <div className="absolute inset-0 pointer-events-none z-10">
+          <Fireworks className="pointer-events-none" />
+        </div>
+      )}
+
       {isCancelled ? (
         <span className="icon-badge bg-gradient-to-br from-gray-400 to-gray-500 mx-auto mb-4">
           <XCircleIcon className="w-6 h-6 relative" aria-hidden="true" />
@@ -74,6 +99,23 @@ export default function Confirmation() {
             : `Confirmed ${new Date(reservation.confirmed_at).toLocaleString()}`}
         </p>
       </div>
+
+      {trip?.departure_time && (
+        <div className="card p-5 mt-4">
+          <StatusTimeline departureTime={trip.departure_time} cancelled={isCancelled} />
+        </div>
+      )}
+
+      {!isCancelled && trip?.departure_time && (
+        <div className="mt-4">
+          <VehicleTracker
+            tripId={trip.id}
+            origin={trip.origin}
+            destination={trip.destination}
+            departureTime={trip.departure_time}
+          />
+        </div>
+      )}
 
       {cancelError && (
         <div className="mt-4 text-left">

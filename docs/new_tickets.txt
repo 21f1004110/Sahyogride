@@ -1,0 +1,409 @@
+SahyogRide — New Ticket Backlog (Phase 6-8)
+=============================================
+Continuation of docs/TICKETS.md, starting at SAHYOG-30. Same conventions:
+one ticket = one branch = one commit, acceptance criteria are the
+definition of done. Read docs/API_CONTRACT.md before any ticket that
+touches a response shape — every contract change below is additive
+(new nullable fields), never a breaking rename.
+
+Scope note: SAHYOG-33/34 are explicitly DEMO features for a client
+presentation, not real GPS/telematics. They are simulated client-side
+(no map library, no location hardware, no new backend/infra) by deliberate
+decision, as a conscious, called-out exception to CLAUDE.md's "no maps"
+scope rule — not a silent reinterpretation of it. All other CLAUDE.md
+scope exclusions (payment, waitlist, QR, analytics dashboard, SMS/email,
+admin panel, native app, i18n, microservices/Redis/Docker/K8s, model
+training) still apply unchanged.
+
+---------------------------------------------------------------------
+PHASE 6 — AI feature depth (builds on existing ai_service.py pipeline)
+---------------------------------------------------------------------
+
+SAHYOG-30 — Show AI urgency triage in passenger list
+branch: feat/SAHYOG-30-urgency-badges
+commit: feat(SAHYOG-30): surface AI urgency triage as badges in passenger list
+
+Description:
+SAHYOG-25 already computes ai_urgency_label/ai_urgency_score for every
+confirmed reservation as a post-commit background task, but nothing in
+the UI shows it. Coordinators currently have no way to see which
+riders flagged as high-urgency (medical, dialysis, exams) without
+opening the database. Surface the existing data — no new AI calls.
+
+Acceptance criteria:
+- [ ] GET /trips/{id}/passengers response includes ai_urgency_label
+      (nullable) per passenger — additive field, API_CONTRACT.md updated
+- [ ] PassengerList.jsx shows an urgency badge (High/Medium/Low) next to
+      each passenger, using icon + colour (never colour alone)
+- [ ] Badge is simply omitted (no placeholder, no error) when the value
+      is null — AI disabled, call failed, or triage still pending
+- [ ] Zero new AI calls — this only reads columns SAHYOG-25 already writes
+- [ ] Re-run SAHYOG-24's AI-disabled test to confirm the app still works
+      end-to-end with AI_ENABLED=false (badges just never render)
+
+SAHYOG-31 — AI-generated trip summary blurb
+branch: feat/SAHYOG-31-ai-trip-summary
+commit: feat(SAHYOG-31): generate one-line AI trip summary as a background task
+
+Description:
+trips.ai_summary has existed in the schema since SAHYOG-02 but nothing
+ever writes to it. Add a one-sentence, rider-facing summary ("Medical
+transport for elderly patients — quiet, wheelchair-friendly stop"),
+generated the same way trip embeddings are (post-commit background
+task, never inside create_trip()).
+
+Acceptance criteria:
+- [ ] ai_service.summarize_trip() — schema-validated (Pydantic) response,
+      5s timeout, returns None on any failure, per CLAUDE.md rule #3
+- [ ] Fired from the same background task as SAHYOG-26's embedding job —
+      zero AI calls inside the create-trip transaction
+- [ ] GET /trips, GET /trips/{id}, GET /trips/mine include ai_summary
+      (nullable) — additive contract change, API_CONTRACT.md updated
+- [ ] Trip cards (SearchTrips, TripDetail, MyTrips) show the blurb when
+      present; card layout is unchanged and complete when it's null
+- [ ] docs/AI_PROMPT_SPEC.md updated with the new prompt/schema
+- [ ] Works with AI_ENABLED=false (column stays null, everything else works)
+
+SAHYOG-32 — Coordinator AI digest on passenger list
+branch: feat/SAHYOG-32-coordinator-digest
+commit: feat(SAHYOG-32): add on-demand AI digest of a trip's passenger mix
+
+Description:
+Give coordinators a one-line read of a trip's urgency mix without
+reading every badge individually — e.g. "8 of 12 seats filled; 2
+riders flagged high-urgency (medical)." Computed on demand at request
+time (like SAHYOG-27's /ai/search), not stored, not a background task —
+this is a read endpoint, not inside hold_seat()/confirm_reservation(),
+so a synchronous call with the standard timeout is fine here.
+
+Acceptance criteria:
+- [ ] ai_service.summarize_passenger_mix() — takes confirmed passengers'
+      urgency labels + seat counts, returns one sentence; read-only,
+      cannot alter any booking/reservation state
+- [ ] GET /trips/{id}/passengers gains an optional digest field
+      (nullable string) alongside passengers — additive, API_CONTRACT.md
+      updated
+- [ ] PassengerList.jsx shows the digest as a small callout above the
+      list; page renders fully and normally when digest is null
+- [ ] Standard 5s timeout / None-on-failure; endpoint always returns 200
+- [ ] Works with AI_ENABLED=false (digest always null)
+
+---------------------------------------------------------------------
+PHASE 7 — Live demo features (client-facing polish, explicitly simulated)
+---------------------------------------------------------------------
+
+SAHYOG-33 — Simulated live vehicle tracking widget
+branch: feat/SAHYOG-33-vehicle-tracking-demo
+commit: feat(SAHYOG-33): add simulated real-time vehicle tracking widget
+
+Description:
+Client-requested "wow" feature for demos: a live-feeling vehicle
+tracker on the trip detail page. Explicitly simulated — an SVG line
+between origin and destination labels, an animated vehicle icon moving
+along it, and an "ETA X min - Y stops away" readout, all driven by a
+client-side timer. No map library, no coordinates, no location
+hardware, no backend or infra changes.
+
+Acceptance criteria:
+- [ ] New components/VehicleTracker.jsx — SVG route + animated marker +
+      ETA/stops text, motion driven by setInterval/requestAnimationFrame
+- [ ] Motion is deterministic per trip (seeded from trip.id), not random
+      on every render, so a demo looks the same on repeat
+- [ ] Shown only on TripDetail.jsx for a trip the rider holds/has
+      reserved a seat on
+- [ ] A small caption ("simulated for demo") keeps it honest — this must
+      never be presented as real GPS data
+- [ ] Respects useReducedMotion(); an aria-live="polite" region announces
+      ETA changes for screen readers, not just visual motion
+- [ ] Zero backend changes, zero new AI calls — pure frontend
+
+SAHYOG-34 — Trip status timeline
+branch: feat/SAHYOG-34-status-timeline
+commit: feat(SAHYOG-34): add reservation status timeline to confirmation and history
+
+Description:
+Companion to SAHYOG-33: a step tracker (Requested -> Confirmed ->
+En Route -> Arrived) on the confirmation and reservation-history pages.
+"En Route"/"Arrived" are demo-only, derived client-side from time until
+departure — no new DB columns, no new AI calls, no backend changes.
+
+Acceptance criteria:
+- [ ] New components/StatusTimeline.jsx — steps as above; a cancelled
+      reservation shows a distinct cancelled state instead of the steps
+- [ ] Shown on Confirmation.jsx and each item in MyReservations.jsx
+- [ ] Icon + text per step, never colour alone; verified at 375px width
+
+SAHYOG-35 — Live-feeling seat map
+branch: feat/SAHYOG-35-live-seatmap
+commit: feat(SAHYOG-35): poll trip detail so the seat map updates without a manual refresh
+
+Description:
+Right now two riders looking at the same trip only see each other's
+holds/confirms after a manual refresh. Poll quietly so the seat map
+feels shared and live, which sells the "real-time" story without
+touching booking logic at all — GET /trips/{id} already returns
+live seat state; this is a frontend-only polling + animation change.
+
+Acceptance criteria:
+- [ ] TripDetail.jsx's useQuery adds a ~5s refetchInterval
+- [ ] A seat animates (brief highlight/pulse) when its status changes,
+      instead of silently swapping
+- [ ] Polling pauses when the tab is hidden (refetchIntervalInBackground:
+      false) and never fights with the rider's own in-flight hold/confirm
+- [ ] No backend changes
+
+---------------------------------------------------------------------
+PHASE 8 — Seat selection redesign (2D only — 3D explicitly deferred)
+---------------------------------------------------------------------
+Scope note: a 3D (WebGL/Three.js) seat view was considered and explicitly
+deferred by decision — not dropped for lack of ideas. It would add a real
+new dependency and meaningfully more build/accessibility work for a
+canvas-based widget; the 2D redesign below delivers the "impressive to a
+client" goal without that cost. Revisit only if specifically asked for.
+
+SAHYOG-36 — Bus-shaped 2D seat map layout
+branch: feat/SAHYOG-36-seatmap-layout
+commit: feat(SAHYOG-36): lay out seats as bus rows with an aisle instead of a flat grid
+
+Description:
+SeatMap.jsx currently renders every seat in one flat CSS grid, which
+reads as a spreadsheet, not a vehicle. Chunk seats into rows of 4 (2 |
+aisle | 2) with a decorative "driver/front" marker at the top, so the
+layout actually looks like the inside of a shuttle. Pure layout change
+— seat data, statuses, and the hold/confirm flow are untouched.
+
+Acceptance criteria:
+- [ ] components/SeatMap.jsx groups seats into rows of 4 with a visible
+      aisle gap between the 2nd and 3rd seat in each row (last partial
+      row splits the same way)
+- [ ] A decorative "driver/front" marker renders above the first row,
+      aria-hidden (it's not a seat, must not be announced as one)
+- [ ] Layout is responsive down to 375px width — rows stack cleanly, no
+      horizontal scroll, seats stay >=44x44px
+- [ ] No change to seat data, statuses, click behaviour, or the
+      hold/confirm API calls — this ticket is layout only
+
+SAHYOG-37 — Seat selection interaction polish
+branch: feat/SAHYOG-37-seat-interaction-polish
+commit: feat(SAHYOG-37): add pending state and keyboard navigation to seat selection
+
+Description:
+Two robustness gaps in the current seat picker: (1) clicking a seat
+gives no feedback until the hold request resolves, which feels laggy;
+(2) unavailable seats use the native `disabled` attribute, which makes
+them unfocusable — a keyboard/screen-reader user can't even discover
+they exist. Fix both.
+
+Acceptance criteria:
+- [ ] TripDetail.jsx passes which seat_id has an in-flight hold request
+      (holdMutation.isPending) down to SeatMap/Seat; that seat shows a
+      spinner in place of its icon and is not clickable again mid-request
+- [ ] Seat.jsx no longer uses the `disabled` attribute — unavailable
+      seats use aria-disabled instead, so every seat is reachable by
+      keyboard, but only available seats respond to Enter/Space/click
+- [ ] SeatMap.jsx implements roving tabIndex + arrow-key navigation
+      (Left/Right/Up/Down moves focus between seats, matching the bus
+      row/column layout from SAHYOG-36) so the whole map is one tab stop,
+      not N
+- [ ] Status still conveyed by icon + colour, never colour alone
+      (unchanged from existing rule); pending state adds a spinner, not
+      a colour-only change
+- [ ] No backend changes, no new dependencies
+
+---------------------------------------------------------------------
+PHASE 9 — AI depth round 2 + seat map polish
+---------------------------------------------------------------------
+Scope note: a 3D seat view remains explicitly deferred (see Phase 8).
+These four tickets keep every CLAUDE.md AI rule intact: AI isolated to
+ai_service.py, 5s timeout/None-on-failure, zero write power (suggests
+only, never books/holds/confirms), zero AI calls inside hold_seat()/
+confirm_reservation()'s locked transaction, no model training, no new
+infra/dependencies.
+
+SAHYOG-38 — AI smart seat pick
+branch: feat/SAHYOG-38-ai-seat-pick
+commit: feat(SAHYOG-38): suggest one seat from a rider's free-text note
+
+Description:
+Let a rider type a short note ("wheelchair", "traveling with a
+toddler", "prefer near the front") and get ONE suggested seat + a
+one-line reason, computed synchronously (not a background task, not
+inside hold_seat()/confirm_reservation()). The rider still has to
+click the seat themselves — this is a suggestion only, the AI can
+never hold or reserve anything. Seat position (front/back, window/
+aisle) is derived server-side from seat_number using the same
+SEATS_PER_ROW=4 convention SeatMap.jsx already renders with — no new
+seat metadata columns.
+
+Acceptance criteria:
+- [ ] ai_service.recommend_seat() — schema-validated (Pydantic)
+      response, 5s timeout, returns None on any failure
+- [ ] New POST /trips/{id}/seat-recommendation (rider only, 200
+      always) — request {note}, response {seat_number, reason,
+      fallback}; API_CONTRACT.md and AI_PROMPT_SPEC.md updated
+- [ ] Server always re-validates the AI's seat_number against the
+      *current* available seats before returning it; an invalid/
+      hallucinated/now-unavailable seat_number falls back to the
+      lowest-numbered currently-available seat with fallback: true —
+      never trusted or returned as-is
+- [ ] No seats available -> {seat_number: null, reason: null,
+      fallback: true}, still 200
+- [ ] Seat.jsx gets a new "suggested" visual treatment, visibly
+      distinct from the existing held_by_me ring
+- [ ] TripDetail.jsx: optional note input, shows the suggested seat
+      highlighted on the map + its reason; rider must still click the
+      seat to hold it — no auto-hold
+- [ ] Zero AI calls inside hold_seat()/confirm_reservation(); this
+      endpoint cannot call either
+- [ ] Works with AI_ENABLED=false (deterministic fallback pick, no
+      error, fallback: true)
+
+SAHYOG-39 — AI similar-trip suggestions
+branch: feat/SAHYOG-39-similar-trips
+commit: feat(SAHYOG-39): suggest alternative trips when a trip is nearly full
+
+Description:
+When a trip has few/zero seats left, show 2-3 alternatives using the
+embedding-similarity approach SAHYOG-26/27 already built. This adds
+NO new AI network call: trips.embedding is already populated by the
+SAHYOG-26 background task, so this is a pure pgvector cosine_distance
+query between the current trip's own embedding and every other trip's
+— read-only, same-destination keyword fallback when a trip's
+embedding is null (mirrors ai_search's fallback pattern exactly).
+
+Acceptance criteria:
+- [ ] New GET /trips/{id}/similar?limit=3 (any authenticated user,
+      200 always) — response {trips: [...same shape as GET /trips
+      items...], fallback}; API_CONTRACT.md updated
+- [ ] Ranks by pgvector cosine_distance on trips.embedding, same
+      SEMANTIC_THRESHOLD as POST /ai/search; excludes the trip itself
+- [ ] Falls back to a same-destination plain query (fallback: true)
+      when the trip's own embedding is null, or when nothing is
+      within threshold but a same-destination match exists
+- [ ] Zero new AI calls — this ticket reuses SAHYOG-26's existing
+      embeddings only, confirmed in AI_PROMPT_SPEC.md
+- [ ] New components/SimilarTrips.jsx, shown on TripDetail.jsx only
+      when seats_available <= 2 (derived client-side from existing
+      seat data, no new field needed to decide this)
+- [ ] Works with AI_ENABLED=false (every trip's embedding stays null,
+      section always shows same-destination fallback results or
+      nothing, never an error)
+
+SAHYOG-40 — AI accessibility note classification
+branch: feat/SAHYOG-40-accessibility-notes
+commit: feat(SAHYOG-40): classify rider accessibility notes for coordinators
+
+Description:
+Let a rider optionally add a short note when confirming a reservation
+("I use a wheelchair", "elderly, need boarding help"). The note itself
+is plain user input, written directly in the same confirm_reservation()
+transaction as the reservation — no AI call inside that transaction.
+Separately, a post-commit background task (extends SAHYOG-25's
+existing reservation-triage task, rather than adding a second one)
+classifies the note into a single tag from a small fixed vocabulary,
+surfaced to coordinators as a new badge on the passenger list.
+
+Acceptance criteria:
+- [ ] New Alembic migration: reservations gains nullable
+      accessibility_note (String(500)) and ai_accessibility_tags
+      (String(50))
+- [ ] ReservationCreateRequest gains optional notes; confirm_reservation()
+      writes it to accessibility_note in the same transaction/commit
+      as today — zero AI calls in booking.py
+- [ ] ai_service.classify_accessibility_note() — schema-validated
+      (Pydantic, single Literal tag from a fixed 7-value vocabulary),
+      5s timeout, returns None on any failure
+- [ ] Classification runs inside the existing run_reservation_triage
+      background task (not a new task/module), fired the same way as
+      today, strictly after confirm_reservation()'s commit
+- [ ] PassengerItem/GET /trips/{id}/passengers gains nullable
+      ai_accessibility_tags; ReservationOut gains accessibility_note;
+      API_CONTRACT.md and AI_PROMPT_SPEC.md updated
+- [ ] TripDetail.jsx: optional notes field in the hold/confirm flow
+- [ ] PassengerList.jsx: new accessibility badge next to the existing
+      urgency badge, icon + colour, omitted (not a placeholder) when
+      null
+- [ ] Works with AI_ENABLED=false (accessibility_note still saves and
+      displays; ai_accessibility_tags stays null, badge just doesn't
+      render)
+
+SAHYOG-41 — Seat map animation/interactivity polish
+branch: feat/SAHYOG-41-seatmap-polish
+commit: feat(SAHYOG-41): add magnetic hover, ripple pulse, count animation, and hold celebration to the seat map
+
+Description:
+Pure frontend polish on top of the SAHYOG-36/37 seat map redesign —
+no AI, no backend changes. (a) wrap clickable seats in the existing
+Magnetic component for a subtle hover pull; (b) upgrade the existing
+seat-pulse box-shadow animation to a visible expanding ripple ring on
+status change; (c) animate SeatLegend's counts with a small count-up/
+down transition when polling picks up a change; (d) a gated
+celebratory moment when a reservation is actually CONFIRMED (on
+Confirmation.jsx, not on hold - a hold is still provisional).
+
+Acceptance criteria:
+- [ ] Seat.jsx wraps only clickable (available, non-pending) seats in
+      <Magnetic>; held/reserved/pending seats are unaffected
+- [ ] .seat-pulse in index.css becomes a visibly expanding ripple ring
+      on status change, not just a box-shadow pulse; unchanged trigger
+      logic in Seat.jsx (still the existing justChanged mechanism)
+- [ ] New components/AnimatedNumber.jsx; TripDetail.jsx's SeatLegend
+      uses it for each status count, animating on the existing 5s poll
+- [ ] When the rider's OWN hold succeeds: the held seat gets a
+      one-shot scale/ring flourish (no Fireworks yet - hold is still
+      provisional)
+- [ ] When a reservation is confirmed: Confirmation.jsx mounts
+      <Fireworks /> briefly (~1.5s) as an absolutely-positioned,
+      pointer-events-none overlay, then unmounts
+- [ ] All motion gated behind useReducedMotion() — with it enabled,
+      Magnetic doesn't offset, the ripple/count/fireworks moments are
+      skipped or reduced to instant state changes, functionality is
+      unaffected
+- [ ] No change to seat data, statuses, click behaviour, hold/confirm
+      API calls, or any backend file — this ticket is animation only
+
+---------------------------------------------------------------------
+PHASE 10 — Gap-check against external feature list
+---------------------------------------------------------------------
+Prompted by an external spec/checklist review of three "AI features":
+semantic search, AI trip triage, embedding backfill. Findings: backfill
+script already matched exactly (no work needed); semantic search worked
+but only as POST, not the GET the spec listed; "flags trips with
+unusually high demand" was never actually built (only per-reservation
+urgency triage existed). This phase closes both gaps.
+
+GET /ai/search?q=... alias
+Added alongside the existing POST /ai/search (not a replacement -
+AssistantBox.jsx depends on the POST/JSON-body form). Same
+ai_search() service underneath, same 200-always/fallback contract.
+See docs/API_CONTRACT.md.
+
+SAHYOG-42 — Trip high-demand flag
+branch: feat/SAHYOG-42-high-demand-flag
+commit: feat(SAHYOG-42): flag trips crossing a seat-fill threshold for coordinator attention
+
+Description:
+"AI Trip Triage" as originally described flags trips with unusually
+high demand, not just per-reservation urgency (SAHYOG-25 already
+covers the latter). Deliberately NOT an LLM call: "is this fill ratio
+over a threshold" is arithmetic, not a semantic judgment, so keeping
+it deterministic means it's always accurate and works identically
+with AI_ENABLED=false - unlike a real AI call, this one can't
+gracefully degrade to null, so it shouldn't depend on AI at all.
+
+Acceptance criteria:
+- [ ] New Alembic migration: trips gains nullable ai_high_demand
+      (Boolean)
+- [ ] Checked in the same post-commit background task as SAHYOG-25/40
+      (reservation_triage.py), after each reservation confirms - not a
+      new task, not inside confirm_reservation()'s transaction
+- [ ] Deterministic: confirmed_reservations / total_seats >=
+      HIGH_DEMAND_THRESHOLD (0.75); never un-flags a trip once set
+- [ ] GET /trips and GET /trips/mine gain nullable ai_high_demand;
+      API_CONTRACT.md and AI_PROMPT_SPEC.md updated (explicitly noting
+      this is NOT an AI call despite the ai_ prefix)
+- [ ] MyTrips.jsx shows a "High demand" badge (icon + colour) on
+      flagged trips, omitted when null
+- [ ] Works identically regardless of AI_ENABLED (this was true before
+      the flag existed too, but explicitly tested here since it's the
+      one ai_* column that isn't actually AI-dependent)

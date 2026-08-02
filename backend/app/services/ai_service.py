@@ -93,6 +93,190 @@ def triage_reservation_urgency(purpose: str | None) -> ReservationTriageResult |
     return _run_with_timeout(_call)
 
 
+class TripSummaryResult(BaseModel):
+    summary: str = Field(min_length=1, max_length=200)
+
+
+def summarize_trip(origin: str, destination: str, purpose: str | None) -> str | None:
+    """One-sentence rider-facing blurb for a trip card (SAHYOG-31,
+    background task after trip commit, same as embed_text). Read-only -
+    describes the trip, cannot alter it.
+    """
+    client = _get_client()
+    if client is None:
+        return None
+
+    def _call() -> str:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You write a single short, warm, rider-facing sentence (max 160 "
+                        "characters) describing a free community shuttle trip, given its "
+                        "origin, destination, and optional purpose. Reply with JSON only, "
+                        'no prose: {"summary": "<sentence>"}. No exclamation points, no '
+                        "emoji, no invented details beyond what's given."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": f"Origin: {origin}\nDestination: {destination}\nPurpose: {purpose or 'unspecified'}",
+                },
+            ],
+            response_format={"type": "json_object"},
+            timeout=settings.ai_timeout_seconds,
+        )
+        raw = json.loads(response.choices[0].message.content)
+        return TripSummaryResult.model_validate(raw).summary
+
+    return _run_with_timeout(_call)
+
+
+class PassengerMixDigestResult(BaseModel):
+    digest: str = Field(min_length=1, max_length=240)
+
+
+def summarize_passenger_mix(total_seats: int, confirmed_count: int, urgency_counts: dict[str, int]) -> str | None:
+    """One-sentence digest of a trip's confirmed-passenger urgency mix for
+    the coordinator viewing the passenger list (SAHYOG-32). Computed
+    synchronously at request time - this endpoint isn't inside
+    hold_seat()/confirm_reservation(), so a sync call with the standard
+    timeout is fine here, same as SAHYOG-27's /ai/search. Read-only -
+    cannot alter any booking/reservation state.
+    """
+    client = _get_client()
+    if client is None or confirmed_count == 0:
+        return None
+
+    def _call() -> str:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You write a single short sentence (max 200 characters) summarising "
+                        "how full a free community shuttle trip is and how many confirmed "
+                        "riders were flagged high/medium/low urgency, for a coordinator "
+                        "skimming a passenger list. Reply with JSON only, no prose: "
+                        '{"digest": "<sentence>"}.'
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": (
+                        f"Total seats: {total_seats}\nConfirmed: {confirmed_count}\n"
+                        f"Urgency counts: {json.dumps(urgency_counts)}"
+                    ),
+                },
+            ],
+            response_format={"type": "json_object"},
+            timeout=settings.ai_timeout_seconds,
+        )
+        raw = json.loads(response.choices[0].message.content)
+        return PassengerMixDigestResult.model_validate(raw).digest
+
+    return _run_with_timeout(_call)
+
+
+class SeatRecommendationResult(BaseModel):
+    seat_number: str
+    reason: str = Field(min_length=1, max_length=200)
+
+
+def recommend_seat(note: str, available_seats: list[dict]) -> SeatRecommendationResult | None:
+    """Suggests ONE seat_number from the given available seats for a
+    rider's free-text note (SAHYOG-38). Read-only - the caller
+    (app/services/seat_recommendation.py) re-validates the returned
+    seat_number against the live available set before trusting it; this
+    function never books/holds anything itself.
+    """
+    client = _get_client()
+    if client is None or not note or not available_seats:
+        return None
+
+    def _call() -> SeatRecommendationResult:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You suggest ONE specific seat for a rider on a free community "
+                        "shuttle, based on their short note and the list of currently "
+                        "available seats (each with a row number - row 1 is nearest the "
+                        "driver/front - and a window/aisle side). Reply with JSON only, no "
+                        'prose: {"seat_number": "<one of the given seat_numbers, exactly>", '
+                        '"reason": "<one short sentence>"}. You must pick seat_number from '
+                        "the provided list only - never invent one."
+                    ),
+                },
+                {
+                    "role": "user",
+                    "content": json.dumps({"note": note, "available_seats": available_seats}),
+                },
+            ],
+            response_format={"type": "json_object"},
+            timeout=settings.ai_timeout_seconds,
+        )
+        raw = json.loads(response.choices[0].message.content)
+        return SeatRecommendationResult.model_validate(raw)
+
+    return _run_with_timeout(_call)
+
+
+AccessibilityTag = Literal[
+    "wheelchair",
+    "mobility_assistance",
+    "visual_impairment",
+    "hearing_impairment",
+    "elderly_support",
+    "child_support",
+    "other",
+]
+
+
+class AccessibilityTagResult(BaseModel):
+    tag: AccessibilityTag
+
+
+def classify_accessibility_note(note: str | None) -> AccessibilityTagResult | None:
+    """Classifies a rider's optional accessibility note (SAHYOG-40) into
+    one tag from a fixed vocabulary, for the post-commit reservation
+    triage background task. Read-only - writes nothing itself.
+    """
+    client = _get_client()
+    if client is None or not note:
+        return None
+
+    def _call() -> AccessibilityTagResult:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You classify a free-text accessibility note from a community "
+                        "shuttle rider into exactly one tag. Reply with JSON only, no "
+                        'prose: {"tag": "wheelchair"|"mobility_assistance"|'
+                        '"visual_impairment"|"hearing_impairment"|"elderly_support"|'
+                        '"child_support"|"other"}. Pick the single closest tag; use '
+                        '"other" if the note does not clearly match any specific category.'
+                    ),
+                },
+                {"role": "user", "content": note},
+            ],
+            response_format={"type": "json_object"},
+            timeout=settings.ai_timeout_seconds,
+        )
+        raw = json.loads(response.choices[0].message.content)
+        return AccessibilityTagResult.model_validate(raw)
+
+    return _run_with_timeout(_call)
+
+
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 

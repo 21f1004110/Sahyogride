@@ -12,6 +12,8 @@ import SearchTrips from "./pages/SearchTrips";
 import TripDetail from "./pages/TripDetail";
 import Confirmation from "./pages/Confirmation";
 import MyReservations from "./pages/MyReservations";
+import MyTrips from "./pages/MyTrips";
+import PassengerList from "./pages/PassengerList";
 
 function RootRoute() {
   const { isAuthenticated } = useAuth();
@@ -102,6 +104,22 @@ function App() {
             <RequireAuth>
               <MyReservations />
             </RequireAuth>
+          }
+        />
+        <Route
+          path="/my-trips"
+          element={
+            <RequireCoordinator>
+              <MyTrips />
+            </RequireCoordinator>
+          }
+        />
+        <Route
+          path="/trips/:id/passengers"
+          element={
+            <RequireCoordinator>
+              <PassengerList />
+            </RequireCoordinator>
           }
         />
       </Routes>

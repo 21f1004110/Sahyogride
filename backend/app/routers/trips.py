@@ -6,9 +6,28 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user, require_role
 from app.models import User, UserRole
-from app.schemas import TripCreateRequest, TripDetailOut, TripListItem, TripListResponse, TripOut
+from app.schemas import (
+    PassengerListResponse,
+    SeatRecommendationRequest,
+    SeatRecommendationResponse,
+    SimilarTripsResponse,
+    TripCreateRequest,
+    TripDetailOut,
+    TripListItem,
+    TripListResponse,
+    TripOut,
+)
+from app.services.seat_recommendation import recommend_seat
+from app.services.similar_trips import find_similar_trips
 from app.services.trip_embedding import run_trip_embedding
-from app.services.trip_service import create_trip, get_trip_detail, search_trips
+from app.services.trip_service import (
+    create_trip,
+    get_passenger_digest,
+    get_trip_detail,
+    list_my_trips,
+    list_trip_passengers,
+    search_trips,
+)
 
 router = APIRouter(prefix="/trips", tags=["trips"])
 
@@ -46,6 +65,31 @@ def search_trips_endpoint(
             total_seats=trip.total_seats,
             seats_available=seats_available,
             purpose=trip.purpose,
+            ai_summary=trip.ai_summary,
+            ai_high_demand=trip.ai_high_demand,
+        )
+        for trip, seats_available in results
+    ]
+    return TripListResponse(trips=trips)
+
+
+@router.get("/mine", response_model=TripListResponse)
+def list_my_trips_endpoint(
+    db: Session = Depends(get_db),
+    coordinator: User = Depends(require_role(UserRole.COORDINATOR)),
+) -> TripListResponse:
+    results = list_my_trips(db, coordinator.id)
+    trips = [
+        TripListItem(
+            id=trip.id,
+            origin=trip.origin,
+            destination=trip.destination,
+            departure_time=trip.departure_time,
+            total_seats=trip.total_seats,
+            seats_available=seats_available,
+            purpose=trip.purpose,
+            ai_summary=trip.ai_summary,
+            ai_high_demand=trip.ai_high_demand,
         )
         for trip, seats_available in results
     ]
@@ -59,3 +103,34 @@ def get_trip_endpoint(
     user: User = Depends(get_current_user),
 ) -> TripDetailOut:
     return get_trip_detail(db, trip_id, user.id)
+
+
+@router.get("/{trip_id}/passengers", response_model=PassengerListResponse)
+def get_trip_passengers_endpoint(
+    trip_id: int,
+    db: Session = Depends(get_db),
+    coordinator: User = Depends(require_role(UserRole.COORDINATOR)),
+) -> PassengerListResponse:
+    trip, passengers = list_trip_passengers(db, trip_id, coordinator.id)
+    digest = get_passenger_digest(trip, passengers)
+    return PassengerListResponse(passengers=passengers, digest=digest)
+
+
+@router.post("/{trip_id}/seat-recommendation", response_model=SeatRecommendationResponse)
+def seat_recommendation_endpoint(
+    trip_id: int,
+    body: SeatRecommendationRequest,
+    db: Session = Depends(get_db),
+    _rider: User = Depends(require_role(UserRole.RIDER)),
+) -> SeatRecommendationResponse:
+    return recommend_seat(db, trip_id, body.note)
+
+
+@router.get("/{trip_id}/similar", response_model=SimilarTripsResponse)
+def similar_trips_endpoint(
+    trip_id: int,
+    limit: int = 3,
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> SimilarTripsResponse:
+    return find_similar_trips(db, trip_id, limit=limit)

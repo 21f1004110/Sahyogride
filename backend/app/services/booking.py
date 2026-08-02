@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.errors import AppError
-from app.models import Hold, Reservation, ReservationStatus, Seat, SeatStatus
+from app.models import Hold, Reservation, ReservationStatus, Seat, SeatStatus, Trip
 from app.schemas import ReservationHistoryItem
 
 
@@ -75,7 +75,9 @@ def release_hold(db: Session, hold_id: int, rider_id: int) -> None:
     db.commit()
 
 
-def confirm_reservation(db: Session, hold_id: int, rider_id: int) -> Reservation:
+def confirm_reservation(
+    db: Session, hold_id: int, rider_id: int, accessibility_note: str | None = None
+) -> Reservation:
     """Zero AI calls. Locking the hold row (rather than the seat) is what
     serializes a double-confirm race: the loser's SELECT ... FOR UPDATE
     blocks until the winner commits and deletes the row, so it then sees
@@ -94,7 +96,9 @@ def confirm_reservation(db: Session, hold_id: int, rider_id: int) -> Reservation
         raise AppError("HOLD_EXPIRED")
 
     seat = db.query(Seat).filter(Seat.id == hold.seat_id).with_for_update().first()
-    reservation = Reservation(seat_id=hold.seat_id, trip_id=hold.trip_id, rider_id=rider_id)
+    reservation = Reservation(
+        seat_id=hold.seat_id, trip_id=hold.trip_id, rider_id=rider_id, accessibility_note=accessibility_note
+    )
     db.delete(hold)
     if seat is not None:
         seat.status = SeatStatus.RESERVED
@@ -139,8 +143,9 @@ def cancel_reservation(db: Session, reservation_id: int, rider_id: int) -> Reser
 def list_my_reservations(db: Session, rider_id: int) -> list[ReservationHistoryItem]:
     """Read-only, zero AI calls. Most recent first."""
     rows = (
-        db.query(Reservation, Seat.seat_number)
+        db.query(Reservation, Seat.seat_number, Trip.origin, Trip.destination, Trip.departure_time)
         .join(Seat, Seat.id == Reservation.seat_id)
+        .join(Trip, Trip.id == Reservation.trip_id)
         .filter(Reservation.rider_id == rider_id)
         .order_by(Reservation.confirmed_at.desc())
         .all()
@@ -153,8 +158,11 @@ def list_my_reservations(db: Session, rider_id: int) -> list[ReservationHistoryI
             status=reservation.status.value,
             confirmed_at=reservation.confirmed_at,
             cancelled_at=reservation.cancelled_at,
+            trip_origin=origin,
+            trip_destination=destination,
+            departure_time=departure_time,
         )
-        for reservation, seat_number in rows
+        for reservation, seat_number, origin, destination, departure_time in rows
     ]
 
 

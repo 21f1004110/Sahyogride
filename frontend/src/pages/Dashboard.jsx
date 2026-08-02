@@ -1,6 +1,11 @@
 import { Link } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowRightIcon, MagnifyingGlassIcon, PlusCircleIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowRightIcon,
+  MagnifyingGlassIcon,
+  PlusCircleIcon,
+  UserGroupIcon,
+} from "@heroicons/react/24/outline";
 
 import { useAuth } from "../context/AuthContext";
 
@@ -76,6 +81,27 @@ export default function Dashboard() {
                 </p>
                 <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-brand-600 group-hover:gap-2 transition-all">
                   New trip
+                  <ArrowRightIcon className="w-4 h-4" aria-hidden="true" />
+                </span>
+              </Link>
+            </motion.div>
+          )}
+
+          {user.role === "coordinator" && (
+            <motion.div variants={item}>
+              <Link
+                to="/my-trips"
+                className="card group p-6 h-full flex flex-col hover:shadow-lg hover:-translate-y-0.5 hover:border-primary-200 transition"
+              >
+                <span className="icon-badge bg-gradient-to-br from-primary-500 to-primary-700 mb-4">
+                  <UserGroupIcon className="w-6 h-6 relative" aria-hidden="true" />
+                </span>
+                <h2 className="font-heading font-semibold text-gray-900 mb-1">My trips</h2>
+                <p className="text-sm text-gray-600 flex-1">
+                  View your published trips and their passenger lists.
+                </p>
+                <span className="mt-4 inline-flex items-center gap-1 text-sm font-medium text-primary-600 group-hover:gap-2 transition-all">
+                  View trips
                   <ArrowRightIcon className="w-4 h-4" aria-hidden="true" />
                 </span>
               </Link>

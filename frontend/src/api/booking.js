@@ -1,7 +1,7 @@
 import client from "./client";
 
-export async function confirmReservation(holdId) {
-  const res = await client.post("/reservations", { hold_id: holdId });
+export async function confirmReservation(holdId, notes) {
+  const res = await client.post("/reservations", { hold_id: holdId, notes: notes || null });
   return res.data;
 }
 

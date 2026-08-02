@@ -6,6 +6,7 @@ import { cancelReservation, getMyReservations } from "../api/booking";
 import Empty from "../components/states/Empty";
 import ErrorState from "../components/states/ErrorState";
 import Loading from "../components/states/Loading";
+import StatusTimeline from "../components/StatusTimeline";
 
 const STATUS_BADGE = {
   confirmed: "badge-green",
@@ -58,37 +59,41 @@ export default function MyReservations() {
               initial={reduceMotion ? false : { opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: reduceMotion ? 0 : i * 0.05, ease: "easeOut" }}
-              className="card p-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+              className="card p-5 flex flex-col gap-4"
             >
-              <div className="min-w-0">
-                <Link
-                  to={`/trips/${r.trip_id}`}
-                  className="font-heading font-semibold text-gray-900 hover:text-primary-600 break-words"
-                >
-                  Trip #{r.trip_id} &middot; Seat {r.seat_number}
-                </Link>
-                <p className="text-sm text-gray-500 mt-1">
-                  {r.status === "cancelled"
-                    ? `Cancelled ${new Date(r.cancelled_at).toLocaleString()}`
-                    : `Confirmed ${new Date(r.confirmed_at).toLocaleString()}`}
-                </p>
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0">
+                  <Link
+                    to={`/trips/${r.trip_id}`}
+                    className="font-heading font-semibold text-gray-900 hover:text-primary-600 break-words"
+                  >
+                    {r.trip_origin} &rarr; {r.trip_destination} &middot; Seat {r.seat_number}
+                  </Link>
+                  <p className="text-sm text-gray-500 mt-1">
+                    {r.status === "cancelled"
+                      ? `Cancelled ${new Date(r.cancelled_at).toLocaleString()}`
+                      : `Confirmed ${new Date(r.confirmed_at).toLocaleString()}`}
+                  </p>
+                </div>
+
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className={STATUS_BADGE[r.status]}>{r.status}</span>
+                  {r.status === "confirmed" && (
+                    <button
+                      type="button"
+                      onClick={() => cancelMutation.mutate(r.id)}
+                      disabled={cancelMutation.isPending}
+                      className="btn-secondary"
+                    >
+                      {cancelMutation.isPending && cancelMutation.variables === r.id
+                        ? "Cancelling…"
+                        : "Cancel"}
+                    </button>
+                  )}
+                </div>
               </div>
 
-              <div className="flex items-center gap-3 shrink-0">
-                <span className={STATUS_BADGE[r.status]}>{r.status}</span>
-                {r.status === "confirmed" && (
-                  <button
-                    type="button"
-                    onClick={() => cancelMutation.mutate(r.id)}
-                    disabled={cancelMutation.isPending}
-                    className="btn-secondary"
-                  >
-                    {cancelMutation.isPending && cancelMutation.variables === r.id
-                      ? "Cancelling…"
-                      : "Cancel"}
-                  </button>
-                )}
-              </div>
+              <StatusTimeline departureTime={r.departure_time} cancelled={r.status === "cancelled"} />
             </motion.li>
           ))}
         </ul>

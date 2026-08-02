@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.database import get_db
@@ -19,3 +19,17 @@ def ai_search_endpoint(
     _user: User = Depends(get_current_user),
 ) -> AISearchResponse:
     return ai_search(db, body.query)
+
+
+@router.get("/search", response_model=AISearchResponse)
+def ai_search_get_endpoint(
+    q: str = Query(min_length=1, max_length=500),
+    db: Session = Depends(get_db),
+    _user: User = Depends(get_current_user),
+) -> AISearchResponse:
+    """GET alias for POST /ai/search, same underlying service - some
+    clients/specs expect a query-param GET for a read-only search. Kept
+    alongside the POST version rather than replacing it, since
+    AssistantBox.jsx already depends on POST with a JSON body.
+    """
+    return ai_search(db, q)

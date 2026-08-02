@@ -144,3 +144,30 @@ def test_ai_search_rejects_empty_query():
     rider = register("rider")
     res = client.post("/ai/search", json={"query": ""}, headers=auth_header(rider["token"]))
     assert res.status_code == 422
+
+
+def test_ai_search_get_alias_matches_post(monkeypatch):
+    monkeypatch.setattr(settings, "ai_enabled", False)
+
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], destination=f"UniqueDest-{uuid.uuid4().hex[:8]}")
+
+    res = client.get(
+        "/ai/search", params={"q": trip["destination"]}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["fallback"] is True
+    assert any(t["id"] == trip["id"] for t in body["trips"])
+
+
+def test_ai_search_get_requires_auth():
+    res = client.get("/ai/search", params={"q": "anything"})
+    assert res.status_code == 401
+
+
+def test_ai_search_get_rejects_empty_query():
+    rider = register("rider")
+    res = client.get("/ai/search", params={"q": ""}, headers=auth_header(rider["token"]))
+    assert res.status_code == 422

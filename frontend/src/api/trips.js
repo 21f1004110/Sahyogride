@@ -26,3 +26,18 @@ export async function getTrip(id) {
   const res = await client.get(`/trips/${id}`);
   return res.data;
 }
+
+export async function getMyTrips() {
+  const res = await client.get("/trips/mine");
+  return res.data;
+}
+
+export async function getTripPassengers(id) {
+  const res = await client.get(`/trips/${id}/passengers`);
+  return res.data;
+}
+
+export async function getSimilarTrips(id, limit = 3) {
+  const res = await client.get(`/trips/${id}/similar`, { params: { limit } });
+  return res.data;
+}

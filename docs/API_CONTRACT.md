@@ -67,7 +67,7 @@ Request:
 200: same shape as register's 201.
 Errors: `INVALID_CREDENTIALS` (401).
 
-## Trips — SAHYOG-05, 06, 07, 28
+## Trips — SAHYOG-05, 06, 07, 28, 29, 30, 31, 32, 38, 39, 42
 
 ### `POST /trips`
 Coordinator only.
@@ -99,9 +99,16 @@ Any authenticated user. Query params, all optional: `origin`, `destination`, `da
 
 200:
 ```json
-{ "trips": [ { "id": 1, "origin": "...", "destination": "...", "departure_time": "...", "total_seats": 12, "seats_available": 5, "purpose": "medical" } ] }
+{ "trips": [ { "id": 1, "origin": "...", "destination": "...", "departure_time": "...", "total_seats": 12, "seats_available": 5, "purpose": "medical", "ai_summary": "...", "ai_high_demand": true } ] }
 ```
-No filters matching → `{ "trips": [] }`, still 200 (empty state, not an error).
+No filters matching → `{ "trips": [] }`, still 200 (empty state, not an error). `ai_summary` (SAHYOG-31) is a nullable one-sentence AI blurb, populated by a post-commit background task — `null` until it completes, if AI is off, or if the call failed; never an error. `ai_high_demand` (SAHYOG-42) is `true` once a trip's confirmed-seat fill ratio crosses `HIGH_DEMAND_THRESHOLD` (75%), otherwise `null`. Despite the `ai_` prefix this is **not an LLM call** — a fill-ratio threshold is arithmetic, not a semantic judgment — so it's always accurate and works identically with `AI_ENABLED=false`. Never un-flags once set.
+
+### `GET /trips/mine`
+Coordinator only. Added for SAHYOG-29 (`MyTrips.jsx` needs a list of the caller's own trips) — not present in the original SAHYOG-03 draft of this contract.
+
+200: same shape as `GET /trips` (including `ai_summary`/`ai_high_demand`), ordered by `departure_time` descending. Only trips where `coordinator_id` is the caller. No trips → `{ "trips": [] }`, 200. `ai_high_demand` is what `MyTrips.jsx` uses to flag trips needing coordinator attention.
+
+Errors: `FORBIDDEN_ROLE` (403, rider).
 
 ### `GET /trips/{id}`
 Any authenticated user.
@@ -110,11 +117,11 @@ Any authenticated user.
 ```json
 {
   "id": 1, "coordinator_id": 3, "origin": "...", "destination": "...", "departure_time": "...",
-  "total_seats": 12, "purpose": "medical",
+  "total_seats": 12, "purpose": "medical", "ai_summary": "...",
   "seats": [ { "id": 10, "seat_number": "1", "status": "available", "held_by_me": false } ]
 }
 ```
-`status` is `"available" | "held" | "reserved"`. `held_by_me` is computed server-side from the caller's own holds — the frontend must never infer this from local state.
+`status` is `"available" | "held" | "reserved"`. `held_by_me` is computed server-side from the caller's own holds — the frontend must never infer this from local state. `ai_summary` — see `GET /trips` above.
 
 Errors: `NOT_FOUND` (404).
 
@@ -123,9 +130,44 @@ Coordinator only, own trip.
 
 200:
 ```json
-{ "passengers": [ { "reservation_id": 5, "rider_name": "Asha Rao", "seat_number": "1", "confirmed_at": "..." } ] }
+{
+  "passengers": [
+    { "reservation_id": 5, "rider_name": "Asha Rao", "seat_number": "1", "confirmed_at": "...",
+      "ai_urgency_label": "high", "ai_accessibility_tags": "wheelchair" }
+  ],
+  "digest": "8 of 12 seats filled; 2 riders flagged high-urgency (medical)."
+}
 ```
-Only `confirmed` reservations are listed. Errors: `FORBIDDEN_ROLE` (403, rider), `NOT_OWNER` (403, someone else's trip), `NOT_FOUND` (404).
+Only `confirmed` reservations are listed. `ai_urgency_label` (SAHYOG-30) is `"low" | "medium" | "high" | null` — null whenever AI is off, the SAHYOG-25 triage call failed, or hasn't completed yet; never an error. `ai_accessibility_tags` (SAHYOG-40) is one of `"wheelchair" | "mobility_assistance" | "visual_impairment" | "hearing_impairment" | "elderly_support" | "child_support" | "other" | null` — despite the plural name it holds exactly one tag, classified from the rider's optional `POST /reservations` note; `null` under the same conditions as `ai_urgency_label`. `digest` (SAHYOG-32) is a one-sentence AI summary of the passenger mix, computed synchronously per request with the standard 5s timeout — `null` under the same conditions, endpoint still 200.
+
+Errors: `FORBIDDEN_ROLE` (403, rider), `NOT_OWNER` (403, someone else's trip), `NOT_FOUND` (404).
+
+### `POST /trips/{id}/seat-recommendation`
+Rider only.
+
+Request:
+```json
+{ "note": "I use a wheelchair" }
+```
+
+200:
+```json
+{ "seat_number": "1", "reason": "Row 1, aisle side - closest to the front for easy boarding.", "fallback": false }
+```
+`seat_number` (SAHYOG-38) is always re-validated server-side against the trip's *currently* available seats before being returned — an AI answer that isn't actually available right now (hallucination or race condition) is discarded, never trusted, and replaced with the lowest-numbered available seat, `fallback: true`. Same fallback whenever AI is off, unconfigured, or times out. No seats available → `{ "seat_number": null, "reason": null, "fallback": true }`. This is a suggestion only — the AI never calls `POST /holds` itself; the rider still has to click the seat.
+
+Errors: `FORBIDDEN_ROLE` (403, coordinator), `NOT_FOUND` (404), `VALIDATION_ERROR` (422, empty note).
+
+### `GET /trips/{id}/similar?limit=3`
+Any authenticated user.
+
+200:
+```json
+{ "trips": [ { "id": 4, "origin": "...", "destination": "...", "departure_time": "...", "total_seats": 12, "seats_available": 6, "purpose": "medical", "ai_summary": "..." } ], "fallback": false }
+```
+`trips` (SAHYOG-39) is ranked by pgvector `cosine_distance` on `trips.embedding` against the requested trip's own embedding (same `SEMANTIC_THRESHOLD` as `POST /ai/search`), excluding the trip itself. Adds **no new AI network call** — it only reads the `embedding` column SAHYOG-26 already populates. Falls back to a same-destination keyword match (`fallback: true`) when the trip's own embedding is `null`, or when nothing clears the threshold but a same-destination trip exists.
+
+Errors: `NOT_FOUND` (404).
 
 ## Holds — SAHYOG-16
 
@@ -147,18 +189,20 @@ Rider only, own hold. Manual release.
 
 204 (no body). Errors: `NOT_OWNER` (403), `NOT_FOUND` (404).
 
-## Reservations — SAHYOG-17, 20, 21
+## Reservations — SAHYOG-17, 20, 21, 40
 
 ### `POST /reservations`
 Rider only.
 
 Request:
 ```json
-{ "hold_id": 7 }
+{ "hold_id": 7, "notes": "I use a wheelchair" }
 ```
+`notes` (SAHYOG-40) is optional, max 500 chars, plain rider-supplied text — written directly in the same transaction as the reservation, no AI call involved. Classified into `ai_accessibility_tags` afterward (see `GET /trips/{id}/passengers`).
+
 201:
 ```json
-{ "id": 5, "seat_id": 10, "trip_id": 1, "rider_id": 2, "status": "confirmed", "confirmed_at": "2026-07-11T05:05:00Z" }
+{ "id": 5, "seat_id": 10, "trip_id": 1, "rider_id": 2, "status": "confirmed", "confirmed_at": "2026-07-11T05:05:00Z", "accessibility_note": "I use a wheelchair" }
 ```
 Errors: `HOLD_EXPIRED` (410), `NOT_OWNER` (403, someone else's hold), `NOT_FOUND` (404).
 
@@ -167,8 +211,14 @@ Rider only. Own reservations, confirmed and cancelled.
 
 200:
 ```json
-{ "reservations": [ { "id": 5, "trip_id": 1, "seat_number": "1", "status": "confirmed", "confirmed_at": "...", "cancelled_at": null } ] }
+{
+  "reservations": [
+    { "id": 5, "trip_id": 1, "seat_number": "1", "status": "confirmed", "confirmed_at": "...", "cancelled_at": null,
+      "trip_origin": "City Hospital", "trip_destination": "Railway Station", "departure_time": "..." }
+  ]
+}
 ```
+`trip_origin`/`trip_destination`/`departure_time` (SAHYOG-34) let the frontend render the trip name and a status timeline without a second request per reservation.
 
 ### `POST /reservations/{id}/cancel`
 Rider only, own reservation.
@@ -195,5 +245,8 @@ Request:
 { "trips": [ { "id": 1, "origin": "...", "destination": "...", "departure_time": "..." } ], "fallback": false }
 ```
 On AI failure, timeout, or `AI_ENABLED=false`: same shape, `"fallback": true`, `trips` populated via plain keyword search instead (never an empty failure with no results if a keyword match exists). The frontend renders these results with no error styling — a fallback is not a bug.
+
+### `GET /ai/search?q=...`
+Any authenticated user. Same underlying service as `POST /ai/search` above (same 200-always/fallback behaviour) — a query-param GET alias for clients that expect one. `AssistantBox.jsx` uses the POST form; this exists alongside it, not instead of it.
 
 Reservation urgency triage (SAHYOG-25) and trip embeddings (SAHYOG-26) run as background tasks after commit and have no dedicated endpoint; their output surfaces as the nullable `ai_urgency_label`/`ai_urgency_score` fields on reservations once exposed, and via `POST /ai/search`'s semantic ranking, respectively.

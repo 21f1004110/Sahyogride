@@ -76,6 +76,8 @@ class TripListItem(BaseModel):
     total_seats: int
     seats_available: int
     purpose: str | None
+    ai_summary: str | None = None
+    ai_high_demand: bool | None = None
 
     model_config = {"from_attributes": True}
 
@@ -99,6 +101,7 @@ class TripDetailOut(BaseModel):
     departure_time: datetime
     total_seats: int
     purpose: str | None
+    ai_summary: str | None = None
     seats: list[SeatOut]
 
 
@@ -118,6 +121,7 @@ class HoldOut(BaseModel):
 
 class ReservationCreateRequest(BaseModel):
     hold_id: int
+    notes: str | None = Field(default=None, max_length=500)
 
 
 class ReservationOut(BaseModel):
@@ -127,6 +131,7 @@ class ReservationOut(BaseModel):
     rider_id: int
     status: str
     confirmed_at: datetime
+    accessibility_note: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -146,10 +151,27 @@ class ReservationHistoryItem(BaseModel):
     status: str
     confirmed_at: datetime
     cancelled_at: datetime | None
+    trip_origin: str
+    trip_destination: str
+    departure_time: datetime
 
 
 class ReservationHistoryResponse(BaseModel):
     reservations: list[ReservationHistoryItem]
+
+
+class PassengerItem(BaseModel):
+    reservation_id: int
+    rider_name: str
+    seat_number: str
+    confirmed_at: datetime
+    ai_urgency_label: str | None = None
+    ai_accessibility_tags: str | None = None
+
+
+class PassengerListResponse(BaseModel):
+    passengers: list[PassengerItem]
+    digest: str | None = None
 
 
 class AISearchRequest(BaseModel):
@@ -167,4 +189,19 @@ class AISearchTripItem(BaseModel):
 
 class AISearchResponse(BaseModel):
     trips: list[AISearchTripItem]
+    fallback: bool
+
+
+class SeatRecommendationRequest(BaseModel):
+    note: str = Field(min_length=1, max_length=500)
+
+
+class SeatRecommendationResponse(BaseModel):
+    seat_number: str | None
+    reason: str | None
+    fallback: bool
+
+
+class SimilarTripsResponse(BaseModel):
+    trips: list[TripListItem]
     fallback: bool
