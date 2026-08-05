@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.errors import AppError
 from app.models import Hold, Reservation, ReservationStatus, Seat, SeatStatus, Trip, User
-from app.schemas import PassengerItem, SeatOut, TripCreateRequest, TripDetailOut
+from app.schemas import BusStopOut, PassengerItem, SeatOut, TripCreateRequest, TripDetailOut
 from app.services import ai_service
 
 
@@ -150,4 +150,6 @@ def get_trip_detail(db: Session, trip_id: int, rider_id: int) -> TripDetailOut:
         purpose=trip.purpose,
         ai_summary=trip.ai_summary,
         seats=seat_items,
+        bus_stops=[BusStopOut.model_validate(stop) for stop in trip.bus_stops],
+        current_stop_sequence=trip.current_stop_sequence,
     )

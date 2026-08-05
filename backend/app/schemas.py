@@ -93,6 +93,14 @@ class SeatOut(BaseModel):
     held_by_me: bool
 
 
+class BusStopOut(BaseModel):
+    id: int
+    name: str
+    sequence: int
+
+    model_config = {"from_attributes": True}
+
+
 class TripDetailOut(BaseModel):
     id: int
     coordinator_id: int
@@ -103,6 +111,29 @@ class TripDetailOut(BaseModel):
     purpose: str | None
     ai_summary: str | None = None
     seats: list[SeatOut]
+    bus_stops: list[BusStopOut] = []
+    current_stop_sequence: int | None = None
+
+
+class SetBusStopsRequest(BaseModel):
+    stop_names: list[str] = Field(min_length=1, max_length=20)
+
+    @field_validator("stop_names")
+    @classmethod
+    def names_must_not_be_blank(cls, value: list[str]) -> list[str]:
+        cleaned = [name.strip() for name in value]
+        if any(not name or len(name) > 255 for name in cleaned):
+            raise ValueError("stop names must be 1-255 characters")
+        return cleaned
+
+
+class SetCurrentStopRequest(BaseModel):
+    sequence: int = Field(ge=0)
+
+
+class BusStopStatusResponse(BaseModel):
+    stops: list[BusStopOut]
+    current_stop_sequence: int | None
 
 
 class HoldCreateRequest(BaseModel):

@@ -8,7 +8,7 @@ import { cancelReservation } from "../api/booking";
 import Empty from "../components/states/Empty";
 import ErrorState from "../components/states/ErrorState";
 import StatusTimeline from "../components/StatusTimeline";
-import VehicleTracker from "../components/VehicleTracker";
+import BusStopTracker from "../components/BusStopTracker";
 import Fireworks from "../components/Fireworks";
 
 export default function Confirmation() {
@@ -106,14 +106,9 @@ export default function Confirmation() {
         </div>
       )}
 
-      {!isCancelled && trip?.departure_time && (
+      {!isCancelled && trip?.id && (
         <div className="mt-4">
-          <VehicleTracker
-            tripId={trip.id}
-            origin={trip.origin}
-            destination={trip.destination}
-            departureTime={trip.departure_time}
-          />
+          <BusStopTracker tripId={trip.id} />
         </div>
       )}
 

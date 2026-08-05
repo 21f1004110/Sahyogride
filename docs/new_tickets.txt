@@ -512,3 +512,48 @@ Acceptance criteria:
 - [ ] API_CONTRACT.md and AI_PROMPT_SPEC.md updated
 - [ ] No changes to hold_seat()/confirm_reservation() or any locked
       transaction - this is a fully standalone read endpoint
+
+---------------------------------------------------------------------
+PHASE 13 — Coordinator-managed bus stops + live status
+---------------------------------------------------------------------
+
+SAHYOG-46 — Coordinator bus stops and rider-facing live position
+branch: feat/SAHYOG-46-bus-stops
+commit: feat(SAHYOG-46): let coordinators manage bus stops and a live vehicle position
+
+Description:
+Supersedes the earlier purely-simulated VehicleTracker.jsx (SAHYOG-33)
+with a real, coordinator-driven flow: a coordinator defines an ordered
+route of named stops (boarding point to destination - plain text, can
+be filled with placeholder/dummy names, no GPS/maps library or
+coordinates - stays inside CLAUDE.md's "no maps" scope exclusion) and
+manually marks which stop the vehicle is currently at. Riders see this
+position update live via the same 5s poll on GET /trips/{id} the seat
+map already uses (SAHYOG-35) - no new polling endpoint, no AI
+involvement anywhere in this ticket.
+
+Acceptance criteria:
+- [ ] New Alembic migration: bus_stops table (trip_id, name, sequence,
+      unique on trip_id+sequence) and trips.current_stop_sequence
+      (nullable int, not a FK - avoids a circular FK with bus_stops);
+      verified reversible
+- [ ] PUT /trips/{id}/stops (coordinator, own trip) replaces the
+      route in one call, 1-20 stops, resets current_stop_sequence
+- [ ] PATCH /trips/{id}/stops/current (coordinator, own trip) sets
+      current_stop_sequence; 422 if no stops configured or sequence
+      out of range
+- [ ] GET /trips/{id} gains bus_stops (default []) and
+      current_stop_sequence (default null) for any authenticated user
+- [ ] ManageStops.jsx (new page, /trips/:id/stops, coordinator-only,
+      linked from MyTrips.jsx): editable ordered stop list with a
+      "fill with sample stops" convenience button, plus a tap-to-set
+      current-position control once a route is saved
+- [ ] BusStopTracker.jsx (new component, replaces VehicleTracker.jsx
+      which is now deleted): live-polled ordered stop list with the
+      current stop highlighted, shown on Confirmation.jsx and
+      MyReservations.jsx (confirmed reservations only); graceful
+      empty state when no route has been configured yet, never an
+      error
+- [ ] No changes to hold_seat()/confirm_reservation() or any locked
+      transaction, no AI calls anywhere in this ticket
+- [ ] API_CONTRACT.md updated

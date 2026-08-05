@@ -6,6 +6,7 @@ import {
   FireIcon,
   SparklesIcon,
   TagIcon,
+  TruckIcon,
   UserGroupIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
@@ -93,9 +94,19 @@ export default function MyTrips() {
                   </p>
                 </div>
 
-                <Link to={`/trips/${trip.id}/passengers`} className="btn-secondary mt-4 justify-center">
-                  View passengers
-                </Link>
+                <div className="flex gap-2 mt-4">
+                  <Link to={`/trips/${trip.id}/passengers`} className="btn-secondary flex-1 justify-center">
+                    View passengers
+                  </Link>
+                  <Link
+                    to={`/trips/${trip.id}/stops`}
+                    className="btn-secondary flex-1 justify-center"
+                    aria-label="Manage bus stops and live status"
+                  >
+                    <TruckIcon className="w-4 h-4" aria-hidden="true" />
+                    Stops
+                  </Link>
+                </div>
               </div>
             </motion.li>
           ))}

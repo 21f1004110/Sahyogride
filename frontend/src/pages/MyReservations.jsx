@@ -7,6 +7,7 @@ import Empty from "../components/states/Empty";
 import ErrorState from "../components/states/ErrorState";
 import Loading from "../components/states/Loading";
 import StatusTimeline from "../components/StatusTimeline";
+import BusStopTracker from "../components/BusStopTracker";
 
 const STATUS_BADGE = {
   confirmed: "badge-green",
@@ -94,6 +95,8 @@ export default function MyReservations() {
               </div>
 
               <StatusTimeline departureTime={r.departure_time} cancelled={r.status === "cancelled"} />
+
+              {r.status === "confirmed" && <BusStopTracker tripId={r.trip_id} />}
             </motion.li>
           ))}
         </ul>

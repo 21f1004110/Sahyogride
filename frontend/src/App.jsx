@@ -14,6 +14,7 @@ import Confirmation from "./pages/Confirmation";
 import MyReservations from "./pages/MyReservations";
 import MyTrips from "./pages/MyTrips";
 import PassengerList from "./pages/PassengerList";
+import ManageStops from "./pages/ManageStops";
 
 function RootRoute() {
   const { isAuthenticated } = useAuth();
@@ -119,6 +120,14 @@ function App() {
           element={
             <RequireCoordinator>
               <PassengerList />
+            </RequireCoordinator>
+          }
+        />
+        <Route
+          path="/trips/:id/stops"
+          element={
+            <RequireCoordinator>
+              <ManageStops />
             </RequireCoordinator>
           }
         />

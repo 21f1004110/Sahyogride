@@ -41,3 +41,13 @@ export async function getSimilarTrips(id, limit = 3) {
   const res = await client.get(`/trips/${id}/similar`, { params: { limit } });
   return res.data;
 }
+
+export async function setBusStops(tripId, stopNames) {
+  const res = await client.put(`/trips/${tripId}/stops`, { stop_names: stopNames });
+  return res.data;
+}
+
+export async function setCurrentStop(tripId, sequence) {
+  const res = await client.patch(`/trips/${tripId}/stops/current`, { sequence });
+  return res.data;
+}

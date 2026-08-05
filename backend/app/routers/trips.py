@@ -7,9 +7,13 @@ from app.database import get_db
 from app.deps import get_current_user, require_role
 from app.models import User, UserRole
 from app.schemas import (
+    BusStopOut,
+    BusStopStatusResponse,
     PassengerListResponse,
     SeatRecommendationRequest,
     SeatRecommendationResponse,
+    SetBusStopsRequest,
+    SetCurrentStopRequest,
     SimilarTripsResponse,
     TripCreateRequest,
     TripDetailOut,
@@ -17,6 +21,7 @@ from app.schemas import (
     TripListResponse,
     TripOut,
 )
+from app.services import bus_stops as bus_stops_service
 from app.services.seat_recommendation import recommend_seat
 from app.services.similar_trips import find_similar_trips
 from app.services.trip_embedding import run_trip_embedding
@@ -134,3 +139,31 @@ def similar_trips_endpoint(
     _user: User = Depends(get_current_user),
 ) -> SimilarTripsResponse:
     return find_similar_trips(db, trip_id, limit=limit)
+
+
+@router.put("/{trip_id}/stops", response_model=list[BusStopOut])
+def set_bus_stops_endpoint(
+    trip_id: int,
+    body: SetBusStopsRequest,
+    db: Session = Depends(get_db),
+    coordinator: User = Depends(require_role(UserRole.COORDINATOR)),
+) -> list[BusStopOut]:
+    """Replaces the trip's entire route - see app/services/bus_stops.py."""
+    stops = bus_stops_service.set_stops(db, trip_id, coordinator.id, body.stop_names)
+    return [BusStopOut.model_validate(stop) for stop in stops]
+
+
+@router.patch("/{trip_id}/stops/current", response_model=BusStopStatusResponse)
+def set_current_stop_endpoint(
+    trip_id: int,
+    body: SetCurrentStopRequest,
+    db: Session = Depends(get_db),
+    coordinator: User = Depends(require_role(UserRole.COORDINATOR)),
+) -> BusStopStatusResponse:
+    stops, current_stop_sequence = bus_stops_service.set_current_stop(
+        db, trip_id, coordinator.id, body.sequence
+    )
+    return BusStopStatusResponse(
+        stops=[BusStopOut.model_validate(stop) for stop in stops],
+        current_stop_sequence=current_stop_sequence,
+    )

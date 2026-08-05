@@ -118,10 +118,12 @@ Any authenticated user.
 {
   "id": 1, "coordinator_id": 3, "origin": "...", "destination": "...", "departure_time": "...",
   "total_seats": 12, "purpose": "medical", "ai_summary": "...",
-  "seats": [ { "id": 10, "seat_number": "1", "status": "available", "held_by_me": false } ]
+  "seats": [ { "id": 10, "seat_number": "1", "status": "available", "held_by_me": false } ],
+  "bus_stops": [ { "id": 1, "name": "City Hospital (boarding)", "sequence": 0 } ],
+  "current_stop_sequence": null
 }
 ```
-`status` is `"available" | "held" | "reserved"`. `held_by_me` is computed server-side from the caller's own holds — the frontend must never infer this from local state. `ai_summary` — see `GET /trips` above.
+`status` is `"available" | "held" | "reserved"`. `held_by_me` is computed server-side from the caller's own holds — the frontend must never infer this from local state. `ai_summary` — see `GET /trips` above. `bus_stops`/`current_stop_sequence` (SAHYOG-46) — see the Bus stops section below; both are plain coordinator-entered data, not AI, and default to `[]`/`null` until a coordinator sets a route. Riders poll this same endpoint every 5s (SAHYOG-35) to get live position updates — no separate tracking endpoint.
 
 Errors: `NOT_FOUND` (404).
 
@@ -169,6 +171,43 @@ Any authenticated user.
 `trips` (SAHYOG-39) is ranked by pgvector `cosine_distance` on `trips.embedding` against the requested trip's own embedding (same `SEMANTIC_THRESHOLD` as `POST /ai/search`), excluding the trip itself. Adds **no new AI network call** — it only reads the `embedding` column SAHYOG-26 already populates. Falls back to a same-destination keyword match (`fallback: true`) when the trip's own embedding is `null`, or when nothing clears the threshold but a same-destination trip exists.
 
 Errors: `NOT_FOUND` (404).
+
+### Bus stops — SAHYOG-46
+Coordinator-entered route + manually-set live position. No AI, no GPS/maps library, no coordinates — plain names and a plain integer index the coordinator sets by hand. Not scope creep on CLAUDE.md's "no maps" exclusion: there is no map, just an ordered list and a status the coordinator updates.
+
+#### `PUT /trips/{id}/stops`
+Coordinator only, own trip. Replaces the trip's entire route in one call (simplest shape for filling in a route, including placeholder/dummy stop names, rather than add/reorder/delete one at a time).
+
+Request:
+```json
+{ "stop_names": ["City Hospital (boarding)", "Market Square", "Town Hall", "Railway Station (destination)"] }
+```
+`stop_names`: 1-20 entries, each 1-255 chars after trimming, none blank.
+
+200:
+```json
+[ { "id": 1, "name": "City Hospital (boarding)", "sequence": 0 }, { "id": 2, "name": "Market Square", "sequence": 1 } ]
+```
+Replacing the route resets `current_stop_sequence` to `null` — the old index may no longer be valid against the new list.
+
+Errors: `FORBIDDEN_ROLE` (403, rider), `NOT_OWNER` (403, someone else's trip), `NOT_FOUND` (404), `VALIDATION_ERROR` (422, empty list or a blank/too-long name).
+
+#### `PATCH /trips/{id}/stops/current`
+Coordinator only, own trip. Marks which stop the vehicle is at right now.
+
+Request:
+```json
+{ "sequence": 1 }
+```
+
+200:
+```json
+{ "stops": [ { "id": 1, "name": "City Hospital (boarding)", "sequence": 0 } ], "current_stop_sequence": 1 }
+```
+
+Errors: `FORBIDDEN_ROLE` (403, rider), `NOT_OWNER` (403), `NOT_FOUND` (404), `VALIDATION_ERROR` (422, no stops configured yet, or `sequence` outside the route's range).
+
+Riders see the current position via `GET /trips/{id}`'s `bus_stops`/`current_stop_sequence` fields, polled every 5s by `BusStopTracker.jsx` (shown on `Confirmation.jsx` and `MyReservations.jsx`) — no separate read endpoint.
 
 ## Holds — SAHYOG-16
 

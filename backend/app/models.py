@@ -75,7 +75,34 @@ class Trip(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
+    # Coordinator-entered route (SAHYOG-46) - plain names, no GPS/maps
+    # (CLAUDE.md scope exclusion), ordered boarding point -> destination.
+    # current_stop_sequence is a plain int (not a FK to bus_stops.id) to
+    # avoid a circular FK between trips and bus_stops; null means the
+    # coordinator hasn't marked a starting position yet.
+    current_stop_sequence: Mapped[int | None] = mapped_column(nullable=True)
+
     seats: Mapped[list["Seat"]] = relationship(back_populates="trip")
+    bus_stops: Mapped[list["BusStop"]] = relationship(
+        back_populates="trip", order_by="BusStop.sequence", cascade="all, delete-orphan"
+    )
+
+
+class BusStop(Base):
+    """A coordinator-entered waypoint on a trip's route, boarding point to
+    destination (SAHYOG-46). Plain text names, no coordinates - this is a
+    manual status flow, not GPS/maps tracking (CLAUDE.md scope exclusion).
+    """
+
+    __tablename__ = "bus_stops"
+    __table_args__ = (UniqueConstraint("trip_id", "sequence", name="uq_bus_stops_trip_sequence"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trip_id: Mapped[int] = mapped_column(ForeignKey("trips.id", ondelete="CASCADE"))
+    name: Mapped[str] = mapped_column(String(255))
+    sequence: Mapped[int]
+
+    trip: Mapped["Trip"] = relationship(back_populates="bus_stops")
 
 
 class Seat(Base):
