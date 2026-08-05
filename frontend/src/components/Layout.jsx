@@ -11,6 +11,7 @@ import { MagnifyingGlassIcon } from "@heroicons/react/24/solid";
 import { useAuth } from "../context/AuthContext";
 import BackgroundBlobs from "./BackgroundBlobs";
 import Avatar from "./Avatar";
+import HelpAssistant from "./HelpAssistant";
 
 function NavLink({ to, children }) {
   const location = useLocation();
@@ -93,6 +94,8 @@ export default function Layout({ children }) {
           {children}
         </motion.main>
       </AnimatePresence>
+
+      {user && <HelpAssistant />}
     </div>
   );
 }

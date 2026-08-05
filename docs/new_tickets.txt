@@ -472,3 +472,43 @@ Acceptance criteria:
       existing RequireCoordinator guard) instead of continuing to
       render stale and failing requests silently
 - [ ] No backend changes - this was purely a frontend state-sync gap
+
+---------------------------------------------------------------------
+PHASE 12 — Conversational rider assistant
+---------------------------------------------------------------------
+
+SAHYOG-45 — AI help assistant for "how does this app work" questions
+branch: feat/SAHYOG-45-help-assistant
+commit: feat(SAHYOG-45): add a conversational help assistant for booking questions
+
+Description:
+A floating "Ask for help" widget, available on every authenticated
+page, answers general questions about how SahyogRide works (holding a
+seat, hold expiry, cancelling, accessibility notes, creating a trip,
+that the app is free). Deliberately given no database access and no
+trip/reservation/account data - it can only answer from a fixed FAQ,
+so there's nothing sensitive for it to leak even if the rider's
+question tries to instruct it otherwise (the system prompt also
+explicitly tells it to treat the question as a question, never as a
+command). Same "zero write power" guarantee as every other AI surface
+in this app: it cannot book, cancel, or look up anything.
+
+Acceptance criteria:
+- [ ] POST /ai/assistant, any authenticated user (rider or
+      coordinator), request { "question": str }, 1-300 chars
+- [ ] 200 always, { "answer": str, "fallback": bool } - same
+      never-a-5xx contract as every other AI endpoint
+- [ ] AI call (ai_service.answer_rider_question) takes no DB session
+      and is only ever given the question plus a static FAQ string -
+      never a specific trip/reservation/account
+- [ ] Deterministic keyword-match fallback (app/services/
+      rider_assistant.py) over the same FAQ when AI is off,
+      unconfigured, or fails - answers stay sensible with
+      AI_ENABLED=false, same guarantee as every other AI feature
+- [ ] HelpAssistant.jsx: floating button + expandable panel, mounted
+      site-wide in Layout.jsx for authenticated users, starter
+      questions, "Answered by AI" vs "Answered from FAQ" footer per
+      message (same convention as AssistantBox's fallback footer)
+- [ ] API_CONTRACT.md and AI_PROMPT_SPEC.md updated
+- [ ] No changes to hold_seat()/confirm_reservation() or any locked
+      transaction - this is a fully standalone read endpoint

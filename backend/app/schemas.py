@@ -228,3 +228,12 @@ class SeatRecommendationResponse(BaseModel):
 class SimilarTripsResponse(BaseModel):
     trips: list[TripListItem]
     fallback: bool
+
+
+class AssistantQuestionRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=300)
+
+
+class AssistantAnswerResponse(BaseModel):
+    answer: str
+    fallback: bool

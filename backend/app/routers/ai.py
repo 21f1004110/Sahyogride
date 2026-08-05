@@ -4,7 +4,8 @@ from sqlalchemy.orm import Session
 from app.database import get_db
 from app.deps import get_current_user
 from app.models import User
-from app.schemas import AISearchRequest, AISearchResponse
+from app.schemas import AISearchRequest, AISearchResponse, AssistantAnswerResponse, AssistantQuestionRequest
+from app.services import rider_assistant
 from app.services.ai_search import ai_search
 
 router = APIRouter(prefix="/ai", tags=["ai"])
@@ -33,3 +34,15 @@ def ai_search_get_endpoint(
     AssistantBox.jsx already depends on POST with a JSON body.
     """
     return ai_search(db, q)
+
+
+@router.post("/assistant", response_model=AssistantAnswerResponse)
+def assistant_endpoint(
+    body: AssistantQuestionRequest,
+    _user: User = Depends(get_current_user),
+) -> AssistantAnswerResponse:
+    """General how-does-this-app-work help, available to any authenticated
+    user (rider or coordinator) - no DB session needed, this never reads
+    or writes trip/reservation data (SAHYOG-45).
+    """
+    return rider_assistant.answer_question(body.question)

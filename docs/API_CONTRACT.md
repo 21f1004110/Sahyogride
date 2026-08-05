@@ -232,7 +232,7 @@ Rider only, own reservation.
 ```
 Cancelling an already-cancelled reservation is a no-op: returns 200 with the existing cancelled state, not an error. Errors: `NOT_OWNER` (403), `NOT_FOUND` (404).
 
-## AI — SAHYOG-25, 26, 27
+## AI — SAHYOG-25, 26, 27, 45
 
 AI has zero write powers — it only parses, searches, and summarises (CLAUDE.md rule #3). No AI endpoint can book, cancel, or modify anything.
 
@@ -253,3 +253,19 @@ On AI failure, timeout, or `AI_ENABLED=false`: same shape, `"fallback": true`, `
 Any authenticated user. Same underlying service as `POST /ai/search` above (same 200-always/fallback behaviour) — a query-param GET alias for clients that expect one. `AssistantBox.jsx` uses the POST form; this exists alongside it, not instead of it.
 
 Reservation urgency triage (SAHYOG-25) and trip embeddings (SAHYOG-26) run as background tasks after commit and have no dedicated endpoint; their output surfaces as the nullable `ai_urgency_label`/`ai_urgency_score` fields on reservations once exposed, and via `POST /ai/search`'s semantic ranking, respectively.
+
+### `POST /ai/assistant`
+Any authenticated user (rider or coordinator). Powers `HelpAssistant.jsx`, the floating help widget shown on every page. Answers general how-does-this-app-work questions only — it has no database access and is never given any specific trip/reservation/account data, so it cannot look anything up even if asked to.
+
+Request:
+```json
+{ "question": "How do I cancel my booking?" }
+```
+
+**200 always**, same fallback contract as `POST /ai/search`:
+```json
+{ "answer": "Go to 'My reservations' and tap 'Cancel' on the booking - this frees the seat immediately for another rider.", "fallback": true }
+```
+`fallback: false` means the AI answered (grounded in a fixed FAQ context, instructed to ignore any instructions embedded in the question itself — the prompt-injection defence for this endpoint, since it's the one AI surface that takes truly free-form user text). `fallback: true` means AI was off/unconfigured/failed and a deterministic FAQ keyword match answered instead (or a generic pointer to "My reservations"/"My trips" if nothing matched) — never an error, never a 5xx.
+
+Errors: `UNAUTHENTICATED` (401), `VALIDATION_ERROR` (422, blank question).
