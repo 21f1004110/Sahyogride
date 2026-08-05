@@ -85,7 +85,11 @@ def test_app_works_completely_with_ai_disabled(monkeypatch):
     hold_id = hold_res.json()["id"]
 
     # confirm (rider)
-    confirm_res = client.post("/reservations", json={"hold_id": hold_id}, headers=auth(rider_token))
+    confirm_res = client.post(
+        "/reservations",
+        json={"hold_id": hold_id, "passenger_name": "Test Passenger", "passenger_phone": "9876543210"},
+        headers=auth(rider_token),
+    )
     assert confirm_res.status_code == 201, confirm_res.text
     reservation_id = confirm_res.json()["id"]
     assert confirm_res.json()["status"] == "confirmed"

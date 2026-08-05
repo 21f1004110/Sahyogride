@@ -407,3 +407,68 @@ Acceptance criteria:
 - [ ] Works identically regardless of AI_ENABLED (this was true before
       the flag existed too, but explicitly tested here since it's the
       one ai_* column that isn't actually AI-dependent)
+
+---------------------------------------------------------------------
+PHASE 11 — Passenger contact details + cross-tab auth fix
+---------------------------------------------------------------------
+
+SAHYOG-43 — Capture passenger name and phone at booking time
+branch: feat/SAHYOG-43-passenger-contact-details
+commit: feat(SAHYOG-43): capture passenger name and phone number at reservation time
+
+Description:
+Coordinators had no way to contact a confirmed rider - the passenger
+list only showed the account name, no phone number, and the actual
+traveller isn't always the account holder. Adds two required fields
+to the confirm-reservation step, stored per-reservation (not on the
+User) and surfaced on the coordinator's passenger list, same pattern
+as SAHYOG-40's accessibility_note (plain rider text, zero AI
+involvement, written in the same transaction as the reservation).
+
+Acceptance criteria:
+- [ ] New Alembic migration: reservations gains nullable
+      passenger_name (String(120)) and passenger_phone (String(20));
+      verified reversible
+- [ ] POST /reservations requires passenger_name (1-120 chars) and
+      passenger_phone (7-20 chars, digits/+/-/()/space, >=7 digits) -
+      422 on missing/blank/malformed
+- [ ] confirm_reservation() takes both as plain parameters passed
+      straight to the Reservation constructor - no new query, no new
+      lock, no AI import; test_concurrency.py stays green
+- [ ] GET /trips/{id}/passengers surfaces passenger_name/
+      passenger_phone per passenger
+- [ ] TripDetail.jsx's confirm-hold form collects both (pre-filling
+      name from the logged-in account as a starting point, still
+      editable); Confirm button disabled until both look valid
+- [ ] PassengerList.jsx shows the passenger's name (falling back to
+      the account name for pre-SAHYOG-43 reservations) and a tel:
+      link for the phone number
+- [ ] API_CONTRACT.md updated
+
+SAHYOG-44 — Fix coordinator passenger list breaking across browser tabs
+branch: fix/SAHYOG-44-cross-tab-auth-sync
+commit: fix(SAHYOG-44): sync auth state across tabs to stop stale-identity requests
+
+Description:
+Reported bug: a coordinator viewing their passenger list in one tab
+saw it fail to load after a rider account was logged into in another
+tab of the same browser. Root cause: the JWT lives in localStorage,
+which is shared across all tabs of one origin - client.js already
+reads the token fresh on every request, but AuthContext's `user`
+state (used to gate coordinator-only routes) was only set on
+mount/login/logout, so the first tab kept rendering as "coordinator"
+while its requests were silently using the second tab's rider token,
+surfacing as an unexplained "couldn't load the passenger list" error
+rather than an honest identity change. Not a backend bug - the
+backend was verified correct via direct API testing (hold -> confirm
+-> passenger list all worked) before this was diagnosed.
+
+Acceptance criteria:
+- [ ] AuthContext listens for the browser's `storage` event and
+      re-syncs `user` state (and clears the TanStack Query cache)
+      whenever another tab changes the stored token/user
+- [ ] A coordinator tab immediately reflects a role change made in
+      another tab (redirected off coordinator-only routes by the
+      existing RequireCoordinator guard) instead of continuing to
+      render stale and failing requests silently
+- [ ] No backend changes - this was purely a frontend state-sync gap

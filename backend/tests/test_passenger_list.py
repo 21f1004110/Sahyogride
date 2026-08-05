@@ -48,11 +48,22 @@ def seat_ids_for(trip_id: int) -> list[int]:
         db.close()
 
 
-def hold_and_confirm(rider_token: str, seat_id: int) -> dict:
+def hold_and_confirm(
+    rider_token: str,
+    seat_id: int,
+    passenger_name: str = "Test Passenger",
+    passenger_phone: str = "9876543210",
+) -> dict:
     hold_res = client.post("/holds", json={"seat_id": seat_id}, headers=auth_header(rider_token))
     assert hold_res.status_code == 201, hold_res.text
     confirm_res = client.post(
-        "/reservations", json={"hold_id": hold_res.json()["id"]}, headers=auth_header(rider_token)
+        "/reservations",
+        json={
+            "hold_id": hold_res.json()["id"],
+            "passenger_name": passenger_name,
+            "passenger_phone": passenger_phone,
+        },
+        headers=auth_header(rider_token),
     )
     assert confirm_res.status_code == 201, confirm_res.text
     return confirm_res.json()
@@ -76,7 +87,9 @@ def test_passenger_list_includes_only_confirmed_reservations():
     trip = create_trip(coordinator["token"], total_seats=3)
     seats = seat_ids_for(trip["id"])
 
-    confirmed = hold_and_confirm(rider_a["token"], seats[0])
+    confirmed = hold_and_confirm(
+        rider_a["token"], seats[0], passenger_name="Jamie Rider", passenger_phone="555-123-4567"
+    )
     cancelled = hold_and_confirm(rider_b["token"], seats[1])
     client.post(f"/reservations/{cancelled['id']}/cancel", headers=auth_header(rider_b["token"]))
     # third seat is merely held, never confirmed
@@ -90,6 +103,36 @@ def test_passenger_list_includes_only_confirmed_reservations():
     assert passengers[0]["rider_name"] == "Test User"
     assert passengers[0]["seat_number"] == "1"
     assert passengers[0]["confirmed_at"]
+    assert passengers[0]["passenger_name"] == "Jamie Rider"
+    assert passengers[0]["passenger_phone"] == "555-123-4567"
+
+
+def test_confirm_reservation_requires_passenger_name_and_phone():
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"])
+    seat_id = seat_ids_for(trip["id"])[0]
+
+    hold_res = client.post("/holds", json={"seat_id": seat_id}, headers=auth_header(rider["token"]))
+    res = client.post(
+        "/reservations", json={"hold_id": hold_res.json()["id"]}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 422
+
+
+def test_confirm_reservation_rejects_bad_phone():
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"])
+    seat_id = seat_ids_for(trip["id"])[0]
+
+    hold_res = client.post("/holds", json={"seat_id": seat_id}, headers=auth_header(rider["token"]))
+    res = client.post(
+        "/reservations",
+        json={"hold_id": hold_res.json()["id"], "passenger_name": "Jamie", "passenger_phone": "abc"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 422
 
 
 def test_passenger_list_response_includes_urgency_and_digest_fields():

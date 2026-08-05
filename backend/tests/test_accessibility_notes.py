@@ -53,7 +53,7 @@ def seat_ids_for(trip_id: int) -> list[int]:
 def hold_and_confirm(rider_token: str, seat_id: int, notes: str | None = None) -> dict:
     hold_res = client.post("/holds", json={"seat_id": seat_id}, headers=auth_header(rider_token))
     assert hold_res.status_code == 201, hold_res.text
-    body = {"hold_id": hold_res.json()["id"]}
+    body = {"hold_id": hold_res.json()["id"], "passenger_name": "Test Passenger", "passenger_phone": "9876543210"}
     if notes is not None:
         body["notes"] = notes
     confirm_res = client.post("/reservations", json=body, headers=auth_header(rider_token))
@@ -173,7 +173,12 @@ def test_accessibility_note_max_length_enforced():
     hold_res = client.post("/holds", json={"seat_id": seat_id}, headers=auth_header(rider["token"]))
     res = client.post(
         "/reservations",
-        json={"hold_id": hold_res.json()["id"], "notes": "x" * 501},
+        json={
+            "hold_id": hold_res.json()["id"],
+            "notes": "x" * 501,
+            "passenger_name": "Test Passenger",
+            "passenger_phone": "9876543210",
+        },
         headers=auth_header(rider["token"]),
     )
     assert res.status_code == 422

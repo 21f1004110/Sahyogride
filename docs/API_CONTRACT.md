@@ -133,12 +133,13 @@ Coordinator only, own trip.
 {
   "passengers": [
     { "reservation_id": 5, "rider_name": "Asha Rao", "seat_number": "1", "confirmed_at": "...",
-      "ai_urgency_label": "high", "ai_accessibility_tags": "wheelchair" }
+      "ai_urgency_label": "high", "ai_accessibility_tags": "wheelchair",
+      "passenger_name": "Asha Rao", "passenger_phone": "+91 98765 43210" }
   ],
   "digest": "8 of 12 seats filled; 2 riders flagged high-urgency (medical)."
 }
 ```
-Only `confirmed` reservations are listed. `ai_urgency_label` (SAHYOG-30) is `"low" | "medium" | "high" | null` — null whenever AI is off, the SAHYOG-25 triage call failed, or hasn't completed yet; never an error. `ai_accessibility_tags` (SAHYOG-40) is one of `"wheelchair" | "mobility_assistance" | "visual_impairment" | "hearing_impairment" | "elderly_support" | "child_support" | "other" | null` — despite the plural name it holds exactly one tag, classified from the rider's optional `POST /reservations` note; `null` under the same conditions as `ai_urgency_label`. `digest` (SAHYOG-32) is a one-sentence AI summary of the passenger mix, computed synchronously per request with the standard 5s timeout — `null` under the same conditions, endpoint still 200.
+Only `confirmed` reservations are listed. `ai_urgency_label` (SAHYOG-30) is `"low" | "medium" | "high" | null` — null whenever AI is off, the SAHYOG-25 triage call failed, or hasn't completed yet; never an error. `ai_accessibility_tags` (SAHYOG-40) is one of `"wheelchair" | "mobility_assistance" | "visual_impairment" | "hearing_impairment" | "elderly_support" | "child_support" | "other" | null` — despite the plural name it holds exactly one tag, classified from the rider's optional `POST /reservations` note; `null` under the same conditions as `ai_urgency_label`. `digest` (SAHYOG-32) is a one-sentence AI summary of the passenger mix, computed synchronously per request with the standard 5s timeout — `null` under the same conditions, endpoint still 200. `passenger_name`/`passenger_phone` (SAHYOG-43) are the rider-supplied contact details for this specific booking (see `POST /reservations`) — not AI-derived, plain text, `null` only for reservations confirmed before SAHYOG-43 shipped.
 
 Errors: `FORBIDDEN_ROLE` (403, rider), `NOT_OWNER` (403, someone else's trip), `NOT_FOUND` (404).
 
@@ -189,22 +190,24 @@ Rider only, own hold. Manual release.
 
 204 (no body). Errors: `NOT_OWNER` (403), `NOT_FOUND` (404).
 
-## Reservations — SAHYOG-17, 20, 21, 40
+## Reservations — SAHYOG-17, 20, 21, 40, 43
 
 ### `POST /reservations`
 Rider only.
 
 Request:
 ```json
-{ "hold_id": 7, "notes": "I use a wheelchair" }
+{ "hold_id": 7, "notes": "I use a wheelchair", "passenger_name": "Asha Rao", "passenger_phone": "+91 98765 43210" }
 ```
 `notes` (SAHYOG-40) is optional, max 500 chars, plain rider-supplied text — written directly in the same transaction as the reservation, no AI call involved. Classified into `ai_accessibility_tags` afterward (see `GET /trips/{id}/passengers`).
 
+`passenger_name` and `passenger_phone` (SAHYOG-43) are **required**, plain rider-supplied text, not AI — the actual traveller may not be the account holder, so this is captured per-booking rather than reused from the account's `name`. `passenger_name`: 1-120 chars. `passenger_phone`: 7-20 chars, digits plus `+`, `-`, `(`, `)`, and spaces only, at least 7 digits — a loose format check, not carrier/region validation. Both are written in the same transaction as the reservation itself (same pattern as `accessibility_note`); no AI call involved, no extra write power granted anywhere.
+
 201:
 ```json
-{ "id": 5, "seat_id": 10, "trip_id": 1, "rider_id": 2, "status": "confirmed", "confirmed_at": "2026-07-11T05:05:00Z", "accessibility_note": "I use a wheelchair" }
+{ "id": 5, "seat_id": 10, "trip_id": 1, "rider_id": 2, "status": "confirmed", "confirmed_at": "2026-07-11T05:05:00Z", "accessibility_note": "I use a wheelchair", "passenger_name": "Asha Rao", "passenger_phone": "+91 98765 43210" }
 ```
-Errors: `HOLD_EXPIRED` (410), `NOT_OWNER` (403, someone else's hold), `NOT_FOUND` (404).
+Errors: `HOLD_EXPIRED` (410), `NOT_OWNER` (403, someone else's hold), `NOT_FOUND` (404), `VALIDATION_ERROR` (422, missing/blank `passenger_name` or `passenger_phone` that doesn't look like a phone number).
 
 ### `GET /reservations/me`
 Rider only. Own reservations, confirmed and cancelled.

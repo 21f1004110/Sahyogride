@@ -122,6 +122,25 @@ class HoldOut(BaseModel):
 class ReservationCreateRequest(BaseModel):
     hold_id: int
     notes: str | None = Field(default=None, max_length=500)
+    passenger_name: str = Field(min_length=1, max_length=120)
+    passenger_phone: str = Field(min_length=7, max_length=20)
+
+    @field_validator("passenger_name")
+    @classmethod
+    def name_must_not_be_blank(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("passenger_name must not be blank")
+        return stripped
+
+    @field_validator("passenger_phone")
+    @classmethod
+    def phone_must_look_like_a_phone_number(cls, value: str) -> str:
+        stripped = value.strip()
+        digits = [c for c in stripped if c.isdigit()]
+        if len(digits) < 7 or not all(c.isdigit() or c in "+-() " for c in stripped):
+            raise ValueError("passenger_phone must be a valid phone number")
+        return stripped
 
 
 class ReservationOut(BaseModel):
@@ -132,6 +151,8 @@ class ReservationOut(BaseModel):
     status: str
     confirmed_at: datetime
     accessibility_note: str | None = None
+    passenger_name: str | None = None
+    passenger_phone: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -167,6 +188,8 @@ class PassengerItem(BaseModel):
     confirmed_at: datetime
     ai_urgency_label: str | None = None
     ai_accessibility_tags: str | None = None
+    passenger_name: str | None = None
+    passenger_phone: str | None = None
 
 
 class PassengerListResponse(BaseModel):

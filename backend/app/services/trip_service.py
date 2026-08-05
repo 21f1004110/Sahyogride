@@ -100,6 +100,8 @@ def list_trip_passengers(db: Session, trip_id: int, coordinator_id: int) -> tupl
             confirmed_at=reservation.confirmed_at,
             ai_urgency_label=reservation.ai_urgency_label,
             ai_accessibility_tags=reservation.ai_accessibility_tags,
+            passenger_name=reservation.passenger_name,
+            passenger_phone=reservation.passenger_phone,
         )
         for reservation, seat_number, rider_name in rows
     ]

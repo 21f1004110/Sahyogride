@@ -76,7 +76,12 @@ def release_hold(db: Session, hold_id: int, rider_id: int) -> None:
 
 
 def confirm_reservation(
-    db: Session, hold_id: int, rider_id: int, accessibility_note: str | None = None
+    db: Session,
+    hold_id: int,
+    rider_id: int,
+    accessibility_note: str | None = None,
+    passenger_name: str | None = None,
+    passenger_phone: str | None = None,
 ) -> Reservation:
     """Zero AI calls. Locking the hold row (rather than the seat) is what
     serializes a double-confirm race: the loser's SELECT ... FOR UPDATE
@@ -97,7 +102,12 @@ def confirm_reservation(
 
     seat = db.query(Seat).filter(Seat.id == hold.seat_id).with_for_update().first()
     reservation = Reservation(
-        seat_id=hold.seat_id, trip_id=hold.trip_id, rider_id=rider_id, accessibility_note=accessibility_note
+        seat_id=hold.seat_id,
+        trip_id=hold.trip_id,
+        rider_id=rider_id,
+        accessibility_note=accessibility_note,
+        passenger_name=passenger_name,
+        passenger_phone=passenger_phone,
     )
     db.delete(hold)
     if seat is not None:

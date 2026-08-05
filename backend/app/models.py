@@ -143,6 +143,13 @@ class Reservation(Base):
     # as the reservation itself (SAHYOG-40), same as Trip.purpose.
     accessibility_note: Mapped[str | None] = mapped_column(String(500), nullable=True)
 
+    # Rider-supplied contact details for this specific booking (the actual
+    # traveller may not be the account holder) - lets a coordinator reach
+    # the right person to manage the trip. Required by the API for new
+    # reservations; nullable here only so pre-existing rows stay valid.
+    passenger_name: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    passenger_phone: Mapped[str | None] = mapped_column(String(20), nullable=True)
+
     # AI columns - nullable by design, populated by a post-commit background
     # task in SAHYOG-25. The app must work fully with these always null.
     ai_urgency_label: Mapped[str | None] = mapped_column(String(50), nullable=True)

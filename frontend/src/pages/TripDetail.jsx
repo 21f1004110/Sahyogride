@@ -55,6 +55,8 @@ export default function TripDetail() {
   const [seatNote, setSeatNote] = useState("");
   const [suggestion, setSuggestion] = useState(null);
   const [accessibilityNote, setAccessibilityNote] = useState("");
+  const [passengerName, setPassengerName] = useState(user?.name || "");
+  const [passengerPhone, setPassengerPhone] = useState("");
 
   const { data: trip, isLoading, isError, refetch } = useQuery({
     queryKey: ["trip", id],
@@ -89,7 +91,8 @@ export default function TripDetail() {
   });
 
   const confirmMutation = useMutation({
-    mutationFn: ({ holdId, notes }) => confirmReservation(holdId, notes),
+    mutationFn: ({ holdId, notes, passengerName, passengerPhone }) =>
+      confirmReservation(holdId, notes, passengerName, passengerPhone),
     onSuccess: (reservation) => {
       navigate("/confirmation", { state: { reservation, trip } });
     },
@@ -153,6 +156,11 @@ export default function TripDetail() {
     suggestMutation.mutate(trimmed);
   }
 
+  const trimmedPassengerName = passengerName.trim();
+  const trimmedPassengerPhone = passengerPhone.trim();
+  const phoneDigitCount = trimmedPassengerPhone.replace(/\D/g, "").length;
+  const contactDetailsValid = trimmedPassengerName.length > 0 && phoneDigitCount >= 7;
+
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
       <motion.div
@@ -213,6 +221,39 @@ export default function TripDetail() {
             >
               <HoldCountdown expiresAt={activeHold.expiresAt} />
               <div>
+                <label htmlFor="passenger-name" className="field-label">
+                  Passenger name
+                </label>
+                <input
+                  id="passenger-name"
+                  type="text"
+                  value={passengerName}
+                  onChange={(e) => setPassengerName(e.target.value)}
+                  placeholder="Who is travelling?"
+                  maxLength={120}
+                  required
+                  className="input-field !mt-1"
+                />
+              </div>
+              <div>
+                <label htmlFor="passenger-phone" className="field-label">
+                  Contact phone number
+                </label>
+                <input
+                  id="passenger-phone"
+                  type="tel"
+                  value={passengerPhone}
+                  onChange={(e) => setPassengerPhone(e.target.value)}
+                  placeholder="So the coordinator can reach you"
+                  maxLength={20}
+                  required
+                  className="input-field !mt-1"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Needed so the trip coordinator can contact you about this seat.
+                </p>
+              </div>
+              <div>
                 <label htmlFor="accessibility-note" className="field-label">
                   Anything we should know? (optional)
                 </label>
@@ -230,13 +271,23 @@ export default function TripDetail() {
                 type="button"
                 onClick={() => {
                   setConfirmError(null);
-                  confirmMutation.mutate({ holdId: activeHold.holdId, notes: accessibilityNote });
+                  confirmMutation.mutate({
+                    holdId: activeHold.holdId,
+                    notes: accessibilityNote,
+                    passengerName: trimmedPassengerName,
+                    passengerPhone: trimmedPassengerPhone,
+                  });
                 }}
-                disabled={confirmMutation.isPending}
+                disabled={confirmMutation.isPending || !contactDetailsValid}
                 className="btn-primary w-full"
               >
                 {confirmMutation.isPending ? "Confirming…" : "Confirm reservation"}
               </button>
+              {!contactDetailsValid && (
+                <p className="text-xs text-gray-500">
+                  Enter a name and a phone number (at least 7 digits) to confirm.
+                </p>
+              )}
               <button
                 type="button"
                 onClick={() => releaseMutation.mutate(activeHold.holdId)}

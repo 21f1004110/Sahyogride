@@ -65,7 +65,11 @@ def hold_seat_racing(token: str, seat_id: int, barrier: threading.Barrier):
 
 def confirm_racing(token: str, hold_id: int, barrier: threading.Barrier):
     barrier.wait()
-    return client.post("/reservations", json={"hold_id": hold_id}, headers=auth_header(token))
+    return client.post(
+        "/reservations",
+        json={"hold_id": hold_id, "passenger_name": "Test Passenger", "passenger_phone": "9876543210"},
+        headers=auth_header(token),
+    )
 
 
 def test_two_riders_one_seat_only_one_wins():

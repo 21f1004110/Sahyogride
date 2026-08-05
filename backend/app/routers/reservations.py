@@ -23,7 +23,14 @@ def create_reservation_endpoint(
     db: Session = Depends(get_db),
     rider: User = Depends(require_role(UserRole.RIDER)),
 ) -> ReservationOut:
-    reservation = confirm_reservation(db, body.hold_id, rider.id, accessibility_note=body.notes)
+    reservation = confirm_reservation(
+        db,
+        body.hold_id,
+        rider.id,
+        accessibility_note=body.notes,
+        passenger_name=body.passenger_name,
+        passenger_phone=body.passenger_phone,
+    )
     # Fires after this request's response is sent, never inside the
     # booking transaction above - CLAUDE.md rule #2.
     background_tasks.add_task(run_reservation_triage, reservation.id, reservation.trip_id)

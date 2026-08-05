@@ -55,6 +55,9 @@ def hold_seat(rider_token: str, seat_id: int) -> dict:
     return res.json()
 
 
+VALID_CONTACT = {"passenger_name": "Test Passenger", "passenger_phone": "9876543210"}
+
+
 def expire_hold(hold_id: int) -> None:
     db = SessionLocal()
     try:
@@ -72,7 +75,9 @@ def test_confirm_reservation_success():
     seat_id = seat_ids_for(trip["id"])[0]
     hold = hold_seat(rider["token"], seat_id)
 
-    res = client.post("/reservations", json={"hold_id": hold["id"]}, headers=auth_header(rider["token"]))
+    res = client.post(
+        "/reservations", json={"hold_id": hold["id"], **VALID_CONTACT}, headers=auth_header(rider["token"])
+    )
     assert res.status_code == 201, res.text
     body = res.json()
     assert body["seat_id"] == seat_id
@@ -80,6 +85,8 @@ def test_confirm_reservation_success():
     assert body["rider_id"] == rider["user"]["id"]
     assert body["status"] == "confirmed"
     assert body["confirmed_at"]
+    assert body["passenger_name"] == VALID_CONTACT["passenger_name"]
+    assert body["passenger_phone"] == VALID_CONTACT["passenger_phone"]
 
     db = SessionLocal()
     try:
@@ -100,14 +107,18 @@ def test_confirm_reservation_not_owner():
     seat_id = seat_ids_for(trip["id"])[0]
     hold = hold_seat(rider_a["token"], seat_id)
 
-    res = client.post("/reservations", json={"hold_id": hold["id"]}, headers=auth_header(rider_b["token"]))
+    res = client.post(
+        "/reservations", json={"hold_id": hold["id"], **VALID_CONTACT}, headers=auth_header(rider_b["token"])
+    )
     assert res.status_code == 403
     assert res.json()["error"]["code"] == "NOT_OWNER"
 
 
 def test_confirm_reservation_not_found():
     rider = register("rider")
-    res = client.post("/reservations", json={"hold_id": 999999999}, headers=auth_header(rider["token"]))
+    res = client.post(
+        "/reservations", json={"hold_id": 999999999, **VALID_CONTACT}, headers=auth_header(rider["token"])
+    )
     assert res.status_code == 404
     assert res.json()["error"]["code"] == "NOT_FOUND"
 
@@ -120,7 +131,9 @@ def test_confirm_reservation_expired_hold_returns_410():
     hold = hold_seat(rider["token"], seat_id)
     expire_hold(hold["id"])
 
-    res = client.post("/reservations", json={"hold_id": hold["id"]}, headers=auth_header(rider["token"]))
+    res = client.post(
+        "/reservations", json={"hold_id": hold["id"], **VALID_CONTACT}, headers=auth_header(rider["token"])
+    )
     assert res.status_code == 410
     assert res.json()["error"]["code"] == "HOLD_EXPIRED"
 
@@ -132,7 +145,11 @@ def test_confirm_reservation_forbidden_for_coordinator():
     seat_id = seat_ids_for(trip["id"])[0]
     hold = hold_seat(rider["token"], seat_id)
 
-    res = client.post("/reservations", json={"hold_id": hold["id"]}, headers=auth_header(coordinator["token"]))
+    res = client.post(
+        "/reservations",
+        json={"hold_id": hold["id"], **VALID_CONTACT},
+        headers=auth_header(coordinator["token"]),
+    )
     assert res.status_code == 403
     assert res.json()["error"]["code"] == "FORBIDDEN_ROLE"
 
@@ -144,9 +161,13 @@ def test_double_confirm_only_one_succeeds():
     seat_id = seat_ids_for(trip["id"])[0]
     hold = hold_seat(rider["token"], seat_id)
 
-    first = client.post("/reservations", json={"hold_id": hold["id"]}, headers=auth_header(rider["token"]))
+    first = client.post(
+        "/reservations", json={"hold_id": hold["id"], **VALID_CONTACT}, headers=auth_header(rider["token"])
+    )
     assert first.status_code == 201
 
-    second = client.post("/reservations", json={"hold_id": hold["id"]}, headers=auth_header(rider["token"]))
+    second = client.post(
+        "/reservations", json={"hold_id": hold["id"], **VALID_CONTACT}, headers=auth_header(rider["token"])
+    )
     assert second.status_code == 404
     assert second.json()["error"]["code"] == "NOT_FOUND"

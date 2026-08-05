@@ -53,7 +53,13 @@ def hold_and_confirm(rider_token: str, seat_id: int) -> dict:
     hold_res = client.post("/holds", json={"seat_id": seat_id}, headers=auth_header(rider_token))
     assert hold_res.status_code == 201, hold_res.text
     confirm_res = client.post(
-        "/reservations", json={"hold_id": hold_res.json()["id"]}, headers=auth_header(rider_token)
+        "/reservations",
+        json={
+            "hold_id": hold_res.json()["id"],
+            "passenger_name": "Test Passenger",
+            "passenger_phone": "9876543210",
+        },
+        headers=auth_header(rider_token),
     )
     assert confirm_res.status_code == 201, confirm_res.text
     return confirm_res.json()

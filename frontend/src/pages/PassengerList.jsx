@@ -10,6 +10,7 @@ import {
   HeartIcon,
   InformationCircleIcon,
   MinusCircleIcon,
+  PhoneIcon,
   QuestionMarkCircleIcon,
   SparklesIcon,
   SpeakerXMarkIcon,
@@ -120,7 +121,18 @@ export default function PassengerList() {
                 className="card p-5 flex items-center justify-between gap-4"
               >
                 <div className="min-w-0">
-                  <p className="font-heading font-semibold text-gray-900 truncate">{p.rider_name}</p>
+                  <p className="font-heading font-semibold text-gray-900 truncate">
+                    {p.passenger_name || p.rider_name}
+                  </p>
+                  {p.passenger_phone && (
+                    <a
+                      href={`tel:${p.passenger_phone}`}
+                      className="flex items-center gap-1.5 text-sm text-primary-700 hover:underline mt-1"
+                    >
+                      <PhoneIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      {p.passenger_phone}
+                    </a>
+                  )}
                   <p className="text-sm text-gray-500 mt-1">
                     Confirmed {new Date(p.confirmed_at).toLocaleString()}
                   </p>
