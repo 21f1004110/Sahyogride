@@ -49,6 +49,26 @@ def test_assistant_answers_payment_question_via_fallback():
     assert "free" in res.json()["answer"].lower()
 
 
+def test_assistant_answers_vehicle_tracking_question_via_fallback():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant", json={"question": "how can I track the vehicle?"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["fallback"] is True
+    assert "tracker" in body["answer"].lower() or "track" in body["answer"].lower()
+
+
+def test_assistant_routes_where_is_my_bus_to_tracking_not_generic_lookup():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant", json={"question": "where is my bus right now?"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    assert "live vehicle tracker" in res.json()["answer"].lower()
+
+
 def test_assistant_falls_back_to_default_for_unmatched_question():
     rider = register("rider")
     res = client.post(

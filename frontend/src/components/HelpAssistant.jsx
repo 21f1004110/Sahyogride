@@ -10,7 +10,11 @@ import {
 
 import { askAssistant } from "../api/ai";
 
-const STARTER_QUESTIONS = ["How do I cancel a booking?", "Does this cost anything?", "How long is a hold?"];
+const STARTER_QUESTIONS = [
+  "How do I cancel a booking?",
+  "Does this cost anything?",
+  "How can I track the vehicle?",
+];
 
 export default function HelpAssistant() {
   const reduceMotion = useReducedMotion();

@@ -49,6 +49,20 @@ FAQ = [
         ),
     },
     {
+        "topic": "tracking the vehicle",
+        "keywords": [
+            "track", "tracking", "vehicle", "bus location", "where is the bus",
+            "where is my bus", "live location", "current stop", "eta", "position",
+        ],
+        "answer": (
+            "Once your seat is confirmed, check the 'Live vehicle tracker' card on the "
+            "confirmation page or on 'My reservations' - it shows the route and updates "
+            "automatically every few seconds as the coordinator marks which stop the "
+            "vehicle is currently at. If it says tracking hasn't been set up yet, the "
+            "coordinator hasn't added a route for that trip."
+        ),
+    },
+    {
         "topic": "payment",
         "keywords": ["pay", "payment", "cost", "price", "fee", "charge", "money"],
         "answer": "SahyogRide is completely free - there is no payment at any step.",
@@ -72,15 +86,15 @@ FAQ = [
     },
     {
         "topic": "contact/lookup",
-        "keywords": ["my booking", "my reservation status", "where is my", "track my trip"],
+        "keywords": ["my booking", "my reservation status", "where is my"],
         "answer": "Check 'My reservations' for the status of any booking you've made.",
     },
 ]
 
 DEFAULT_ANSWER = (
     "I can help with holding/confirming a seat, cancellations, accessibility notes, "
-    "and creating trips (for coordinators). Try asking about one of those, or check "
-    "'My reservations' / 'My trips' for anything booking-specific."
+    "tracking the vehicle, and creating trips (for coordinators). Try asking about one "
+    "of those, or check 'My reservations' / 'My trips' for anything booking-specific."
 )
 
 
