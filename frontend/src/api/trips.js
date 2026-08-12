@@ -1,12 +1,26 @@
 import client from "./client";
 
-export async function createTrip({ origin, destination, departure_time, total_seats, purpose }) {
+export async function createTrip({
+  origin,
+  destination,
+  departure_time,
+  total_seats,
+  purpose,
+  origin_lat,
+  origin_lng,
+  destination_lat,
+  destination_lng,
+}) {
   const res = await client.post("/trips", {
     origin,
     destination,
     departure_time,
     total_seats,
     purpose: purpose || null,
+    origin_lat: origin_lat ?? null,
+    origin_lng: origin_lng ?? null,
+    destination_lat: destination_lat ?? null,
+    destination_lng: destination_lng ?? null,
   });
   return res.data;
 }

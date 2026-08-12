@@ -13,6 +13,39 @@ import {
 
 import { createTrip } from "../api/trips";
 import ErrorState from "../components/states/ErrorState";
+import GeoMap from "../components/GeoMap";
+
+// Client-side geocoding only (SAHYOG-47) - OpenStreetMap's free Nominatim
+// API, no key/paid service. The backend never geocodes or validates this;
+// it just stores whatever lat/lng numbers (or nulls) it's given.
+async function geocodeLocation(query) {
+  if (!query) return null;
+  try {
+    const res = await fetch(
+      `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`,
+    );
+    const data = await res.json();
+    if (data && data.length > 0) {
+      return { lat: data[0].lat, lon: data[0].lon };
+    }
+  } catch (err) {
+    console.error("Geocoding failed", err);
+  }
+  return null;
+}
+
+async function reverseGeocode(lat, lon) {
+  try {
+    const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
+    const data = await res.json();
+    if (data && data.display_name) {
+      return data.display_name.split(",")[0];
+    }
+  } catch (err) {
+    console.error("Reverse geocoding failed", err);
+  }
+  return null;
+}
 
 const TIPS = [
   "Seats are created automatically, numbered 1 through your total seat count.",
@@ -21,16 +54,71 @@ const TIPS = [
   "This platform is free — no payment details are ever collected.",
 ];
 
+// A bus-sized default so the seat map reads as an actual bus (rows of 4)
+// rather than a couple of seats - coordinators can still type any count
+// from 1 to 100.
+const DEFAULT_TOTAL_SEATS = 40;
+
 export default function CreateTrip() {
   const reduceMotion = useReducedMotion();
   const [origin, setOrigin] = useState("");
+  const [originLat, setOriginLat] = useState("");
+  const [originLng, setOriginLng] = useState("");
   const [destination, setDestination] = useState("");
+  const [destinationLat, setDestinationLat] = useState("");
+  const [destinationLng, setDestinationLng] = useState("");
   const [departureTime, setDepartureTime] = useState("");
-  const [totalSeats, setTotalSeats] = useState(4);
+  const [totalSeats, setTotalSeats] = useState(DEFAULT_TOTAL_SEATS);
   const [purpose, setPurpose] = useState("");
   const [loading, setLoading] = useState(false);
+  const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState(null);
   const [created, setCreated] = useState(null);
+
+  // Geocode on blur, only if the rider/coordinator hasn't already set
+  // coordinates some other way (e.g. "use my location" below) - typing
+  // over an already-geocoded name re-triggers this once they blur again.
+  async function handleOriginBlur() {
+    if (origin && !originLat && !originLng) {
+      const coords = await geocodeLocation(origin);
+      if (coords) {
+        setOriginLat(coords.lat);
+        setOriginLng(coords.lon);
+      }
+    }
+  }
+
+  async function handleDestinationBlur() {
+    if (destination && !destinationLat && !destinationLng) {
+      const coords = await geocodeLocation(destination);
+      if (coords) {
+        setDestinationLat(coords.lat);
+        setDestinationLng(coords.lon);
+      }
+    }
+  }
+
+  function handleUseMyLocation() {
+    if (!navigator.geolocation) {
+      setError("Geolocation isn't supported by this browser.");
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        const { latitude, longitude } = position.coords;
+        setOriginLat(latitude);
+        setOriginLng(longitude);
+        const placeName = await reverseGeocode(latitude, longitude);
+        setOrigin(placeName || "Current location");
+        setIsLocating(false);
+      },
+      () => {
+        setError("Couldn't get your location. Please enter the origin manually.");
+        setIsLocating(false);
+      },
+    );
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -43,12 +131,20 @@ export default function CreateTrip() {
         departure_time: new Date(departureTime).toISOString(),
         total_seats: Number(totalSeats),
         purpose,
+        origin_lat: originLat ? Number(originLat) : null,
+        origin_lng: originLng ? Number(originLng) : null,
+        destination_lat: destinationLat ? Number(destinationLat) : null,
+        destination_lng: destinationLng ? Number(destinationLng) : null,
       });
       setCreated(trip);
       setOrigin("");
+      setOriginLat("");
+      setOriginLng("");
       setDestination("");
+      setDestinationLat("");
+      setDestinationLng("");
       setDepartureTime("");
-      setTotalSeats(4);
+      setTotalSeats(DEFAULT_TOTAL_SEATS);
       setPurpose("");
     } catch (err) {
       setError(err.response?.data?.error?.message || "Couldn't create the trip. Please try again.");
@@ -105,9 +201,19 @@ export default function CreateTrip() {
           {error && <ErrorState message={error} />}
 
           <div>
-            <label htmlFor="origin" className="field-label">
-              Origin
-            </label>
+            <div className="flex items-center justify-between">
+              <label htmlFor="origin" className="field-label">
+                Origin
+              </label>
+              <button
+                type="button"
+                onClick={handleUseMyLocation}
+                disabled={isLocating}
+                className="text-xs font-medium text-primary-600 hover:text-primary-800 disabled:opacity-50"
+              >
+                {isLocating ? "Locating…" : "Use my location"}
+              </button>
+            </div>
             <div className="input-icon-wrap">
               <MapPinIcon className="input-icon" aria-hidden="true" />
               <input
@@ -115,7 +221,12 @@ export default function CreateTrip() {
                 type="text"
                 required
                 value={origin}
-                onChange={(e) => setOrigin(e.target.value)}
+                onChange={(e) => {
+                  setOrigin(e.target.value);
+                  setOriginLat("");
+                  setOriginLng("");
+                }}
+                onBlur={handleOriginBlur}
                 className="input-field !mt-0 pl-10"
               />
             </div>
@@ -132,7 +243,12 @@ export default function CreateTrip() {
                 type="text"
                 required
                 value={destination}
-                onChange={(e) => setDestination(e.target.value)}
+                onChange={(e) => {
+                  setDestination(e.target.value);
+                  setDestinationLat("");
+                  setDestinationLng("");
+                }}
+                onBlur={handleDestinationBlur}
                 className="input-field !mt-0 pl-10"
               />
             </div>
@@ -235,6 +351,18 @@ export default function CreateTrip() {
                       {totalSeats || 0} seats will be created
                     </p>
                   </div>
+                  {(originLat || destinationLat) && (
+                    <div className="mt-4">
+                      <GeoMap
+                        originLat={originLat ? Number(originLat) : null}
+                        originLng={originLng ? Number(originLng) : null}
+                        destinationLat={destinationLat ? Number(destinationLat) : null}
+                        destinationLng={destinationLng ? Number(destinationLng) : null}
+                        originName={origin}
+                        destinationName={destination}
+                      />
+                    </div>
+                  )}
                 </motion.div>
               ) : (
                 <motion.div

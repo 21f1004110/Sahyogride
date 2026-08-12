@@ -1,23 +1,32 @@
 import { useEffect, useRef, useState } from "react";
 import { motion, useReducedMotion } from "framer-motion";
-import { ArrowPathIcon } from "@heroicons/react/24/outline";
+import { ArrowPathIcon, ClockIcon } from "@heroicons/react/24/outline";
 import { SparklesIcon } from "@heroicons/react/24/solid";
 
 import Magnetic from "./Magnetic";
+import SeatIcon from "./SeatIcon";
 
+// `solid` (filled vs outline seat silhouette) is the primary, non-colour
+// signal for occupied vs empty - `badge` adds a second icon for "held"
+// specifically, since outline-seat alone would look identical to
+// available. CLAUDE.md: never colour alone - every state still reads
+// correctly in greyscale.
 export const STATUS_STYLES = {
   available: {
-    icon: "✓",
+    solid: false,
+    badge: null,
     label: "Available",
     classes: "bg-green-100 text-green-800 border-green-300",
   },
   held: {
-    icon: "⏳",
+    solid: false,
+    badge: ClockIcon,
     label: "Held by someone",
     classes: "bg-amber-100 text-amber-800 border-amber-300",
   },
   reserved: {
-    icon: "✕",
+    solid: true,
+    badge: null,
     label: "Reserved",
     classes: "bg-gray-200 text-gray-600 border-gray-300",
   },
@@ -40,7 +49,7 @@ export default function Seat({
   onKeyDown,
 }) {
   const reduceMotion = useReducedMotion();
-  const { icon, classes } = STATUS_STYLES[seat.status] || STATUS_STYLES.available;
+  const { solid, badge: BadgeIcon, classes } = STATUS_STYLES[seat.status] || STATUS_STYLES.available;
   const clickable = seat.status === "available" && typeof onClick === "function" && !pending;
   const label = `Seat ${seat.seat_number}, ${pending ? "holding…" : seat.status}${
     seat.held_by_me ? " (held by you)" : ""
@@ -109,10 +118,18 @@ export default function Seat({
           <SparklesIcon className="w-2.5 h-2.5 text-white" />
         </span>
       )}
+      {BadgeIcon && (
+        <span
+          className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-amber-500 flex items-center justify-center shadow-sm"
+          aria-hidden="true"
+        >
+          <BadgeIcon className="w-2.5 h-2.5 text-white" />
+        </span>
+      )}
       {pending ? (
         <ArrowPathIcon className="w-4 h-4 animate-spin" aria-hidden="true" />
       ) : (
-        <span aria-hidden="true">{icon}</span>
+        <SeatIcon solid={solid} className="w-4 h-4" />
       )}
       <span className="text-xs">{seat.seat_number}</span>
     </motion.button>

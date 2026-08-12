@@ -14,23 +14,28 @@ import ErrorState from "../components/states/ErrorState";
 import { TripDetailSkeleton } from "../components/states/Loading";
 import SeatMap from "../components/SeatMap";
 import { STATUS_STYLES } from "../components/Seat";
+import SeatIcon from "../components/SeatIcon";
 import HoldCountdown from "../components/HoldCountdown";
 import SimilarTrips from "../components/SimilarTrips";
 import AnimatedNumber from "../components/AnimatedNumber";
-
-const LOW_SEATS_THRESHOLD = 2;
+import BusStopTracker from "../components/BusStopTracker";
 
 function SeatLegend({ counts }) {
   return (
     <ul className="space-y-2.5">
-      {Object.entries(STATUS_STYLES).map(([status, { icon, label, classes }]) => (
+      {Object.entries(STATUS_STYLES).map(([status, { solid, badge: BadgeIcon, label, classes }]) => (
         <li key={status} className="flex items-center justify-between gap-2 text-sm text-gray-600">
           <span className="flex items-center gap-2">
             <span
               aria-hidden="true"
-              className={`w-6 h-6 rounded-md border flex items-center justify-center text-xs ${classes}`}
+              className={`relative w-6 h-6 rounded-md border flex items-center justify-center ${classes}`}
             >
-              {icon}
+              <SeatIcon solid={solid} className="w-3.5 h-3.5" />
+              {BadgeIcon && (
+                <span className="absolute -top-1 -right-1 w-3 h-3 rounded-full bg-amber-500 flex items-center justify-center">
+                  <BadgeIcon className="w-2 h-2 text-white" />
+                </span>
+              )}
             </span>
             {label}
           </span>
@@ -113,12 +118,13 @@ export default function TripDetail() {
     onSuccess: (data) => setSuggestion(data),
   });
 
-  const seatsAvailable = trip?.seats?.filter((s) => s.status === "available").length ?? null;
-
+  // Always fetch (not just when seats are low) - riders may want to see
+  // alternatives regardless of this trip's own availability; the section
+  // only renders below when there's an actual match anyway.
   const { data: similarTrips } = useQuery({
     queryKey: ["similar-trips", id],
     queryFn: () => getSimilarTrips(id),
-    enabled: seatsAvailable !== null && seatsAvailable <= LOW_SEATS_THRESHOLD,
+    enabled: !!trip,
   });
 
   if (isLoading) return <TripDetailSkeleton />;
@@ -211,6 +217,8 @@ export default function TripDetail() {
             <h2 className="font-heading font-semibold text-gray-900 mb-3">Seat status</h2>
             <SeatLegend counts={counts} />
           </div>
+
+          <BusStopTracker tripId={trip.id} />
 
           {activeHold && (
             <motion.div

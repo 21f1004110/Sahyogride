@@ -108,9 +108,25 @@ export default function PassengerList() {
             </div>
           )}
 
-          <p className="text-sm text-gray-500 mb-4">
-            {data.passengers.length} passenger{data.passengers.length === 1 ? "" : "s"} confirmed
-          </p>
+          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <p className="text-sm text-gray-500">
+              {data.passengers.length} passenger{data.passengers.length === 1 ? "" : "s"} confirmed
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              {data.passengers.some((p) => p.ai_urgency_label === "high") && (
+                <span className="badge-red">
+                  <ExclamationTriangleIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                  {data.passengers.filter((p) => p.ai_urgency_label === "high").length} high urgency
+                </span>
+              )}
+              {data.passengers.some((p) => p.ai_accessibility_tags) && (
+                <span className="badge-purple">
+                  <HandRaisedIcon className="w-3.5 h-3.5" aria-hidden="true" />
+                  {data.passengers.filter((p) => p.ai_accessibility_tags).length} need assistance
+                </span>
+              )}
+            </div>
+          </div>
           <ul className="space-y-3">
             {data.passengers.map((p, i) => (
               <motion.li

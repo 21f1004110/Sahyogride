@@ -1,5 +1,5 @@
 import { Link, useLocation } from "react-router-dom";
-import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowRightStartOnRectangleIcon,
   PlusIcon,
@@ -83,17 +83,23 @@ export default function Layout({ children }) {
         </div>
       </header>
 
-      <AnimatePresence mode="wait" initial={false}>
-        <motion.main
-          key={location.pathname}
-          initial={reduceMotion ? false : { opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={reduceMotion ? {} : { opacity: 0 }}
-          transition={{ duration: 0.22, ease: "easeOut" }}
-        >
-          {children}
-        </motion.main>
-      </AnimatePresence>
+      {/* Deliberately no AnimatePresence/exit animation here (SAHYOG bug
+          fix): AnimatePresence keeps the exiting page's component instance
+          mounted to animate it out, but React Router's useParams()/
+          useLocation() are live/global - a page whose data-fetching keys
+          off useParams() (e.g. TripDetail) re-renders mid-exit with the
+          NEW route's params (often undefined), refetches with a broken
+          key, and can get stuck indefinitely, blocking the entering page
+          from ever mounting. A plain key-based remount (still animates
+          the entering page in) avoids this entirely. */}
+      <motion.main
+        key={location.pathname}
+        initial={reduceMotion ? false : { opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.22, ease: "easeOut" }}
+      >
+        {children}
+      </motion.main>
 
       {user && <HelpAssistant />}
     </div>

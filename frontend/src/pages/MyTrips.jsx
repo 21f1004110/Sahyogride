@@ -49,6 +49,30 @@ export default function MyTrips() {
       )}
 
       {!isLoading && !isError && data.trips.length > 0 && (
+        <>
+        <div className="grid gap-3 grid-cols-3 mb-6">
+          <div className="card p-4 text-center">
+            <p className="font-heading text-2xl font-bold text-gray-900">{data.trips.length}</p>
+            <p className="text-xs text-gray-500 mt-0.5">
+              {data.trips.length === 1 ? "Trip published" : "Trips published"}
+            </p>
+          </div>
+          <div className="card p-4 text-center">
+            <p className="font-heading text-2xl font-bold text-gray-900">
+              {data.trips.reduce((sum, t) => sum + (t.total_seats - t.seats_available), 0)}
+              <span className="text-gray-400 font-normal text-lg">
+                /{data.trips.reduce((sum, t) => sum + t.total_seats, 0)}
+              </span>
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">Seats filled</p>
+          </div>
+          <div className="card p-4 text-center">
+            <p className="font-heading text-2xl font-bold text-gray-900">
+              {data.trips.filter((t) => t.ai_high_demand).length}
+            </p>
+            <p className="text-xs text-gray-500 mt-0.5">High-demand trips</p>
+          </div>
+        </div>
         <ul className="grid gap-4 sm:grid-cols-2">
           {data.trips.map((trip, i) => (
             <motion.li
@@ -111,6 +135,7 @@ export default function MyTrips() {
             </motion.li>
           ))}
         </ul>
+        </>
       )}
     </div>
   );

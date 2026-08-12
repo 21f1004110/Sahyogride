@@ -4,12 +4,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   ArrowLeftIcon,
+  CalendarDaysIcon,
   CheckCircleIcon,
   MapPinIcon,
+  PauseIcon,
+  PlayIcon,
   PlusIcon,
   SparklesIcon,
+  TagIcon,
   TrashIcon,
   TruckIcon,
+  UsersIcon,
 } from "@heroicons/react/24/outline";
 
 import { getTrip, setBusStops, setCurrentStop } from "../api/trips";
@@ -23,6 +28,7 @@ export default function ManageStops() {
   const queryClient = useQueryClient();
   const [stopNames, setStopNames] = useState([]);
   const [initialized, setInitialized] = useState(false);
+  const [autoAdvance, setAutoAdvance] = useState(false);
 
   const { data: trip, isLoading, isError, refetch } = useQuery({
     queryKey: ["trip", id],
@@ -47,6 +53,21 @@ export default function ManageStops() {
     mutationFn: (sequence) => setCurrentStop(id, sequence),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["trip", id] }),
   });
+
+  // Demo convenience only: automatically calls the SAME real PATCH
+  // endpoint a coordinator would click by hand, cycling forward through
+  // the real route - not a fake/client-only animation. Anyone else with
+  // this trip's tracker open (rider or coordinator) sees it move via
+  // their normal 5s poll, same as a manual update.
+  useEffect(() => {
+    if (!autoAdvance || !trip || trip.bus_stops.length === 0) return;
+    const stopCount = trip.bus_stops.length;
+    const current = trip.current_stop_sequence ?? -1;
+    const next = (current + 1) % stopCount;
+    const timeout = setTimeout(() => currentStopMutation.mutate(next), 4000);
+    return () => clearTimeout(timeout);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoAdvance, trip?.current_stop_sequence, trip?.bus_stops?.length]);
 
   if (isLoading) return <Loading />;
   if (isError) {
@@ -102,6 +123,23 @@ export default function ManageStops() {
             {trip.origin} &rarr; {trip.destination}
           </p>
         </div>
+      </div>
+
+      <div className="card p-4 mb-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-gray-600">
+        <span className="flex items-center gap-1.5">
+          <CalendarDaysIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
+          {new Date(trip.departure_time).toLocaleString()}
+        </span>
+        {trip.purpose && (
+          <span className="flex items-center gap-1.5">
+            <TagIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
+            {trip.purpose}
+          </span>
+        )}
+        <span className="flex items-center gap-1.5">
+          <UsersIcon className="w-4 h-4 text-gray-400" aria-hidden="true" />
+          {trip.total_seats} total seats
+        </span>
       </div>
 
       <form onSubmit={handleSave} className="card p-5 space-y-3">
@@ -167,13 +205,34 @@ export default function ManageStops() {
       </form>
 
       <div className="card p-5 mt-6">
-        <h2 className="font-heading font-semibold text-gray-900 mb-1">Current vehicle position</h2>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-heading font-semibold text-gray-900">Current vehicle position</h2>
+          {hasStops && (
+            <button
+              type="button"
+              onClick={() => setAutoAdvance((v) => !v)}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 rounded-full transition ${
+                autoAdvance
+                  ? "bg-primary-600 text-white hover:bg-primary-700"
+                  : "bg-primary-50 text-primary-700 hover:bg-primary-100"
+              }`}
+            >
+              {autoAdvance ? (
+                <PauseIcon className="w-3.5 h-3.5" aria-hidden="true" />
+              ) : (
+                <PlayIcon className="w-3.5 h-3.5" aria-hidden="true" />
+              )}
+              {autoAdvance ? "Stop demo" : "Demo: keep moving"}
+            </button>
+          )}
+        </div>
         {!hasStops ? (
           <Empty message="Save a route above to start setting the vehicle's live position." />
         ) : (
           <>
             <p className="text-sm text-gray-500 mb-4">
               Tap the stop the vehicle is at right now — riders see this update within a few seconds.
+              {autoAdvance && " Demo mode is moving it forward automatically every few seconds."}
             </p>
             <ol className="space-y-2">
               {trip.bus_stops.map((stop, i) => {

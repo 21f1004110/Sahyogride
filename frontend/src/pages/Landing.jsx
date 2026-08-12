@@ -18,7 +18,6 @@ import {
 import Avatar from "../components/Avatar";
 import BackgroundBlobs from "../components/BackgroundBlobs";
 import Fireworks from "../components/Fireworks";
-import HeroIllustration from "../components/HeroIllustration";
 import Magnetic from "../components/Magnetic";
 import SeatMap from "../components/SeatMap";
 
@@ -58,6 +57,7 @@ const AUDIENCES = [
   {
     title: "Riders",
     Icon: UserIcon,
+    image: "/riders.png",
     gradient: "from-brand-500 to-brand-700",
     body: "Anyone who needs a ride for something essential — a hospital appointment, an exam, a shift at work.",
     points: [
@@ -69,6 +69,7 @@ const AUDIENCES = [
   {
     title: "Coordinators",
     Icon: BuildingOffice2Icon,
+    image: "/coordinators.png",
     gradient: "from-primary-500 to-primary-700",
     body: "NGOs, hospitals, and community organizations that run the shuttles riders depend on.",
     points: [
@@ -388,7 +389,16 @@ export default function Landing() {
             }}
             className="relative"
           >
-            <HeroIllustration />
+            <div className="hyper-drive-container rounded-2xl shadow-glass border border-white/50">
+              <div className="hyper-drive-lines" aria-hidden="true"></div>
+              <motion.img
+                src="/hero_shuttle_glass.png"
+                alt="Illustration of a SahyogRide community shuttle"
+                className="w-full object-cover aspect-[4/3] object-center cab-vibrate"
+                animate={reduceMotion ? {} : { scale: [1, 1.02, 1] }}
+                transition={{ duration: 6, repeat: Infinity, ease: "easeInOut" }}
+              />
+            </div>
           </motion.div>
         </motion.div>
       </section>
@@ -435,13 +445,17 @@ export default function Landing() {
                 transition={{ duration: 0.25, ease: "easeOut" }}
                 className="card p-6 h-full border-2 border-transparent hover:border-brand-300 hover:shadow-lg transition-[border-color,box-shadow]"
               >
-                <motion.div
-                  whileHover={reduceMotion ? {} : { scale: 1.08, rotate: -4 }}
-                  transition={{ type: "spring", stiffness: 300, damping: 15 }}
-                  className={`icon-badge bg-gradient-to-br ${audience.gradient} shadow-brand-500/25 mb-4`}
-                >
-                  <audience.Icon className="w-6 h-6 relative" aria-hidden="true" />
-                </motion.div>
+                <div className="h-48 mb-6 overflow-hidden rounded-xl border border-white/40 shadow-sm relative group">
+                  <img
+                    src={audience.image}
+                    alt={audience.title}
+                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" aria-hidden="true"></div>
+                  <div className={`absolute bottom-3 left-3 icon-badge bg-gradient-to-br ${audience.gradient} shadow-black/25`}>
+                    <audience.Icon className="w-6 h-6 relative text-white" aria-hidden="true" />
+                  </div>
+                </div>
                 <h3 className="font-heading font-semibold text-gray-900 mb-1">{audience.title}</h3>
                 <p className="text-sm text-gray-600 mb-4">{audience.body}</p>
                 <ul className="space-y-2">
@@ -456,6 +470,20 @@ export default function Landing() {
             </motion.div>
           ))}
         </div>
+
+        <motion.div
+          initial={reduceMotion ? false : { opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: false, amount: 0.3 }}
+          transition={{ duration: 0.5, delay: 0.2, ease: "easeOut" }}
+          className="mt-12 overflow-hidden rounded-3xl border-4 border-white/80 shadow-xl"
+        >
+          <img
+            src="/community_cab_realistic.png"
+            alt="Real SahyogRide community impact"
+            className="w-full object-cover max-h-[450px] object-center"
+          />
+        </motion.div>
         </div>
       </section>
 
