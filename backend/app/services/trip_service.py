@@ -1,13 +1,33 @@
+import re
 from collections import Counter
 from datetime import date as date_type
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.errors import AppError
 from app.models import Hold, Reservation, ReservationStatus, Seat, SeatStatus, Trip, User
 from app.schemas import BusStopOut, PassengerItem, SeatOut, TripCreateRequest, TripDetailOut
 from app.services import ai_service
+
+# Common filler words in a natural-language query ("I need a ride to the
+# hospital tomorrow morning") that shouldn't be matched literally - the
+# keyword fallback (used whenever AI is off/fails, per CLAUDE.md rule #3)
+# has no real language understanding, so it tokenizes and drops these
+# instead of requiring the entire phrase as one literal substring, which
+# otherwise almost never matches a trip's plain origin/destination/purpose
+# text (e.g. "ride to the airport" doesn't contain "airport" as a whole-
+# phrase substring, but should still match a trip destined for one).
+_SEARCH_STOPWORDS = {
+    "a", "an", "the", "to", "for", "in", "on", "of", "at", "and", "or", "with",
+    "is", "are", "i", "my", "me", "need", "want", "some", "please", "ride",
+    "trip", "find", "looking", "there", "any", "seat", "book", "get",
+}
+
+
+def _search_tokens(q: str) -> list[str]:
+    words = re.findall(r"[a-zA-Z0-9]+", q.lower())
+    return [w for w in words if len(w) >= 3 and w not in _SEARCH_STOPWORDS]
 
 
 def create_trip(db: Session, coordinator: User, data: TripCreateRequest) -> Trip:
@@ -18,6 +38,10 @@ def create_trip(db: Session, coordinator: User, data: TripCreateRequest) -> Trip
         departure_time=data.departure_time,
         total_seats=data.total_seats,
         purpose=data.purpose,
+        origin_lat=data.origin_lat,
+        origin_lng=data.origin_lng,
+        destination_lat=data.destination_lat,
+        destination_lng=data.destination_lng,
     )
     db.add(trip)
     db.flush()
@@ -59,10 +83,20 @@ def search_trips(
     if date:
         query = query.filter(func.date(Trip.departure_time) == date)
     if q:
-        pattern = f"%{q}%"
-        query = query.filter(
-            Trip.origin.ilike(pattern) | Trip.destination.ilike(pattern) | Trip.purpose.ilike(pattern)
-        )
+        whole_pattern = f"%{q}%"
+        conditions = [
+            Trip.origin.ilike(whole_pattern),
+            Trip.destination.ilike(whole_pattern),
+            Trip.purpose.ilike(whole_pattern),
+        ]
+        for token in _search_tokens(q):
+            token_pattern = f"%{token}%"
+            conditions += [
+                Trip.origin.ilike(token_pattern),
+                Trip.destination.ilike(token_pattern),
+                Trip.purpose.ilike(token_pattern),
+            ]
+        query = query.filter(or_(*conditions))
 
     return query.order_by(Trip.departure_time).limit(MAX_SEARCH_RESULTS).all()
 
@@ -149,6 +183,10 @@ def get_trip_detail(db: Session, trip_id: int, rider_id: int) -> TripDetailOut:
         total_seats=trip.total_seats,
         purpose=trip.purpose,
         ai_summary=trip.ai_summary,
+        origin_lat=trip.origin_lat,
+        origin_lng=trip.origin_lng,
+        destination_lat=trip.destination_lat,
+        destination_lng=trip.destination_lng,
         seats=seat_items,
         bus_stops=[BusStopOut.model_validate(stop) for stop in trip.bus_stops],
         current_stop_sequence=trip.current_stop_sequence,

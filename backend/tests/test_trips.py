@@ -61,6 +61,43 @@ def test_coordinator_can_create_trip_with_seats():
         db.close()
 
 
+def test_coordinator_can_create_trip_with_map_coordinates():
+    coordinator = register("coordinator")
+    payload = trip_payload(origin_lat=28.6315, origin_lng=77.2167, destination_lat=28.5562, destination_lng=77.1000)
+    res = client.post("/trips", json=payload, headers=auth_header(coordinator["token"]))
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["origin_lat"] == 28.6315
+    assert body["origin_lng"] == 77.2167
+    assert body["destination_lat"] == 28.5562
+    assert body["destination_lng"] == 77.1
+
+    detail = client.get(f"/trips/{body['id']}", headers=auth_header(coordinator["token"]))
+    assert detail.status_code == 200
+    detail_body = detail.json()
+    assert detail_body["origin_lat"] == 28.6315
+    assert detail_body["destination_lng"] == 77.1
+
+
+def test_create_trip_without_map_coordinates_defaults_to_null():
+    coordinator = register("coordinator")
+    res = client.post("/trips", json=trip_payload(), headers=auth_header(coordinator["token"]))
+    assert res.status_code == 201, res.text
+    body = res.json()
+    assert body["origin_lat"] is None
+    assert body["origin_lng"] is None
+    assert body["destination_lat"] is None
+    assert body["destination_lng"] is None
+
+
+def test_create_trip_rejects_out_of_range_latitude():
+    coordinator = register("coordinator")
+    res = client.post(
+        "/trips", json=trip_payload(origin_lat=999.0), headers=auth_header(coordinator["token"])
+    )
+    assert res.status_code == 422
+
+
 def test_rider_cannot_create_trip():
     rider = register("rider")
     res = client.post("/trips", json=trip_payload(), headers=auth_header(rider["token"]))

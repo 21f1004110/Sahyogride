@@ -62,6 +62,15 @@ class Trip(Base):
     total_seats: Mapped[int]
     purpose: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Optional map coordinates (SAHYOG-47) - geocoded client-side from the
+    # origin/destination text via OpenStreetMap Nominatim, no API key/paid
+    # service. Purely additive display data: search/hold/confirm never read
+    # these, so the app works identically whether they're set or null.
+    origin_lat: Mapped[float | None] = mapped_column(nullable=True)
+    origin_lng: Mapped[float | None] = mapped_column(nullable=True)
+    destination_lat: Mapped[float | None] = mapped_column(nullable=True)
+    destination_lng: Mapped[float | None] = mapped_column(nullable=True)
+
     # AI columns - nullable by design, populated by a post-commit background
     # task in SAHYOG-26. The app must work fully with these always null.
     embedding: Mapped[list[float] | None] = mapped_column(Vector(EMBEDDING_DIM), nullable=True)

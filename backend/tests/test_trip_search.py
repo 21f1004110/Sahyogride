@@ -101,7 +101,33 @@ def test_search_filters_by_free_text_q_matching_purpose():
     rider = register("rider")
     trip = create_trip(coordinator["token"])
 
-    res = client.get("/trips", params={"q": trip["purpose"]}, headers=auth_header(rider["token"]))
+    # Search on the random suffix, not the full "medical-xxxx" string -
+    # "medical" alone is tokenized and matched as a standalone word
+    # (natural-language search improvement), which is correct/desired but
+    # means it can now match every other "medical" trip on this shared,
+    # never-truncated-between-tests DB, easily exceeding the 50-result cap
+    # before this specific trip's turn. The random suffix is what actually
+    # pins down this one trip regardless of how many others exist.
+    unique_suffix = trip["purpose"].rsplit("-", 1)[-1]
+    res = client.get("/trips", params={"q": unique_suffix}, headers=auth_header(rider["token"]))
+    assert trip["id"] in [t["id"] for t in res.json()["trips"]]
+
+
+def test_search_free_text_q_matches_on_significant_word_not_whole_phrase():
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(
+        coordinator["token"], origin=unique("Connaught Place"), destination=unique("IGI Airport")
+    )
+
+    # A natural-language query ("I need a ride to the airport") doesn't
+    # contain the trip's destination as one literal substring - the
+    # keyword fallback tokenizes and drops filler words ("i", "need",
+    # "a", "ride", "to", "the") so it still matches on "airport".
+    res = client.get(
+        "/trips", params={"q": "I need a ride to the airport"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
     assert trip["id"] in [t["id"] for t in res.json()["trips"]]
 
 

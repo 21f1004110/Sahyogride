@@ -93,6 +93,35 @@ def test_assistant_available_to_coordinator_too():
     assert "trip" in res.json()["answer"].lower()
 
 
+def test_assistant_answers_refund_question():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant", json={"question": "can I get a refund?"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    assert "free" in res.json()["answer"].lower()
+
+
+def test_assistant_answers_who_can_create_trips_not_generic_default():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant", json={"question": "who can create trips?"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    assert "coordinator" in res.json()["answer"].lower()
+
+
+def test_assistant_answers_missed_the_bus_question():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant",
+        json={"question": "what happens if I miss the bus?"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    assert "tracker" in res.json()["answer"].lower()
+
+
 def test_assistant_requires_auth():
     res = client.post("/ai/assistant", json={"question": "how do I cancel?"})
     assert res.status_code == 401

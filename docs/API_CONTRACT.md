@@ -79,16 +79,19 @@ Request:
   "destination": "Railway Station",
   "departure_time": "2026-07-15T09:30:00Z",
   "total_seats": 12,
-  "purpose": "medical"
+  "purpose": "medical",
+  "origin_lat": 28.6315, "origin_lng": 77.2167,
+  "destination_lat": 28.5562, "destination_lng": 77.1000
 }
 ```
-`purpose` is optional free text. `total_seats` seats are auto-generated, numbered `"1"`..`"N"`.
+`purpose` is optional free text. `total_seats` seats are auto-generated, numbered `"1"`..`"N"`. `origin_lat`/`origin_lng`/`destination_lat`/`destination_lng` (SAHYOG-47) are all optional, nullable floats (lat: -90..90, lng: -180..180) — plain display data for `GeoMap.jsx`, geocoded client-side from the typed origin/destination text via OpenStreetMap's free Nominatim API (`CreateTrip.jsx`), no key/paid service. The backend never geocodes, validates against, or otherwise reads these beyond storing and returning them — search/hold/confirm are entirely unaffected whether they're set or null.
 
 201:
 ```json
 {
   "id": 1, "coordinator_id": 3, "origin": "City Hospital", "destination": "Railway Station",
   "departure_time": "2026-07-15T09:30:00Z", "total_seats": 12, "purpose": "medical",
+  "origin_lat": 28.6315, "origin_lng": 77.2167, "destination_lat": 28.5562, "destination_lng": 77.1000,
   "created_at": "2026-07-11T05:00:00Z"
 }
 ```
@@ -118,12 +121,13 @@ Any authenticated user.
 {
   "id": 1, "coordinator_id": 3, "origin": "...", "destination": "...", "departure_time": "...",
   "total_seats": 12, "purpose": "medical", "ai_summary": "...",
+  "origin_lat": 28.6315, "origin_lng": 77.2167, "destination_lat": 28.5562, "destination_lng": 77.1000,
   "seats": [ { "id": 10, "seat_number": "1", "status": "available", "held_by_me": false } ],
   "bus_stops": [ { "id": 1, "name": "City Hospital (boarding)", "sequence": 0 } ],
   "current_stop_sequence": null
 }
 ```
-`status` is `"available" | "held" | "reserved"`. `held_by_me` is computed server-side from the caller's own holds — the frontend must never infer this from local state. `ai_summary` — see `GET /trips` above. `bus_stops`/`current_stop_sequence` (SAHYOG-46) — see the Bus stops section below; both are plain coordinator-entered data, not AI, and default to `[]`/`null` until a coordinator sets a route. Riders poll this same endpoint every 5s (SAHYOG-35) to get live position updates — no separate tracking endpoint.
+`status` is `"available" | "held" | "reserved"`. `held_by_me` is computed server-side from the caller's own holds — the frontend must never infer this from local state. `ai_summary` — see `GET /trips` above. `origin_lat`/`origin_lng`/`destination_lat`/`destination_lng` (SAHYOG-47) — see `POST /trips` above; `null`/`null` until a coordinator provides them, rendered by `GeoMap.jsx` on `TripDetail.jsx` when at least one endpoint has coordinates. `bus_stops`/`current_stop_sequence` (SAHYOG-46) — see the Bus stops section below; both are plain coordinator-entered data, not AI, and default to `[]`/`null` until a coordinator sets a route. Riders poll this same endpoint every 5s (SAHYOG-35) to get live position updates — no separate tracking endpoint.
 
 Errors: `NOT_FOUND` (404).
 

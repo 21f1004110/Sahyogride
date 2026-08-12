@@ -64,8 +64,14 @@ FAQ = [
     },
     {
         "topic": "payment",
-        "keywords": ["pay", "payment", "cost", "price", "fee", "charge", "money"],
-        "answer": "SahyogRide is completely free - there is no payment at any step.",
+        "keywords": [
+            "pay", "payment", "cost", "price", "fee", "charge", "money", "free",
+            "refund", "expensive", "afford",
+        ],
+        "answer": (
+            "SahyogRide is completely free - there is no payment at any step, so there's "
+            "nothing to refund either."
+        ),
     },
     {
         "topic": "accessibility notes",
@@ -78,15 +84,31 @@ FAQ = [
     },
     {
         "topic": "creating a trip",
-        "keywords": ["create a trip", "publish a trip", "coordinator", "add a trip", "new trip"],
+        "keywords": [
+            "create a trip", "create trips", "creating a trip", "who can create",
+            "publish a trip", "publish trips", "coordinator", "add a trip", "new trip",
+        ],
         "answer": (
             "Coordinators can create a trip from 'My trips' - set the origin, destination, "
             "departure time, and number of seats, and seats are generated automatically."
         ),
     },
     {
+        "topic": "running late or missing the vehicle",
+        "keywords": [
+            "late", "missed", "miss the bus", "left without me", "not there yet",
+            "waiting too long",
+        ],
+        "answer": (
+            "Check the 'Live vehicle tracker' for the current stop and route before you "
+            "head out. The coordinator has the phone number you gave when confirming, so "
+            "they can reach you if needed - if you can no longer make it, cancel your seat "
+            "from 'My reservations' so it frees up for someone else."
+        ),
+    },
+    {
         "topic": "contact/lookup",
-        "keywords": ["my booking", "my reservation status", "where is my"],
+        "keywords": ["my booking", "my reservation status", "where is my", "status of my"],
         "answer": "Check 'My reservations' for the status of any booking you've made.",
     },
 ]

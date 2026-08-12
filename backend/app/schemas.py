@@ -53,6 +53,10 @@ class TripCreateRequest(BaseModel):
     departure_time: datetime
     total_seats: int = Field(gt=0, le=100)
     purpose: str | None = Field(default=None, max_length=255)
+    origin_lat: float | None = Field(default=None, ge=-90, le=90)
+    origin_lng: float | None = Field(default=None, ge=-180, le=180)
+    destination_lat: float | None = Field(default=None, ge=-90, le=90)
+    destination_lng: float | None = Field(default=None, ge=-180, le=180)
 
 
 class TripOut(BaseModel):
@@ -63,6 +67,10 @@ class TripOut(BaseModel):
     departure_time: datetime
     total_seats: int
     purpose: str | None
+    origin_lat: float | None = None
+    origin_lng: float | None = None
+    destination_lat: float | None = None
+    destination_lng: float | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}
@@ -110,6 +118,10 @@ class TripDetailOut(BaseModel):
     total_seats: int
     purpose: str | None
     ai_summary: str | None = None
+    origin_lat: float | None = None
+    origin_lng: float | None = None
+    destination_lat: float | None = None
+    destination_lng: float | None = None
     seats: list[SeatOut]
     bus_stops: list[BusStopOut] = []
     current_stop_sequence: int | None = None

@@ -557,3 +557,53 @@ Acceptance criteria:
 - [ ] No changes to hold_seat()/confirm_reservation() or any locked
       transaction, no AI calls anywhere in this ticket
 - [ ] API_CONTRACT.md updated
+
+---------------------------------------------------------------------
+PHASE 14 — Optional route map on trip pages
+---------------------------------------------------------------------
+
+SAHYOG-47 — Show an optional origin/destination map on trip pages
+branch: feat/SAHYOG-47-geomap-landing-assets
+commit: (see branch)
+
+Description:
+Adds an optional Leaflet/OpenStreetMap route map to CreateTrip.jsx and
+TripDetail.jsx, plus new landing-page photography (rider/coordinator
+cards, hero shuttle image, community impact image). Ported from a
+teammate's separate branch (team078/main) rather than built from
+scratch; adapted to this app's existing seat map, buttons, and card
+styling, none of which changed. Explicitly overrides CLAUDE.md's "no
+maps" scope exclusion at the user's explicit request - flagged and
+confirmed before implementation.
+
+No paid/keyed service anywhere: OpenStreetMap tile server for map
+display, OpenStreetMap Nominatim for free client-side geocoding
+(origin/destination text -> lat/lng on blur, or browser geolocation
+via "Use my location"). The backend never geocodes or validates
+coordinates - it stores and returns four nullable floats on Trip,
+nothing more.
+
+Acceptance criteria:
+- [ ] New Alembic migration: trips gains nullable origin_lat/
+      origin_lng/destination_lat/destination_lng (floats); verified
+      reversible
+- [ ] POST /trips accepts all four as optional (lat: -90..90, lng:
+      -180..180); GET /trips/{id} and the create response return them
+- [ ] GeoMap.jsx (new): Leaflet map with origin/destination markers +
+      route line, bundled marker icons (no external CDN dependency);
+      renders null when no coordinates are set
+- [ ] CreateTrip.jsx: geocodes origin/destination on blur (Nominatim),
+      "Use my location" button, live map preview - existing fields,
+      tips, and button styling unchanged
+- [ ] TripDetail.jsx: new "Route map" card using the existing `card`
+      class (not team078's glass-card redesign), shown only when at
+      least one coordinate pair is set; seat map, buttons, and
+      animations (Magnetic/ripple/pulse) completely unchanged
+- [ ] Landing.jsx: new rider/coordinator card images, hero shuttle
+      image (replacing the animated SVG illustration), community
+      impact image - only additive Tailwind/CSS (a `shadow-glass`
+      utility, `.hyper-drive-*`/`.cab-vibrate` keyframes); existing
+      `.btn-primary`/`.btn-secondary`/`.card`/`.input-field` and the
+      seat-map `.seat-pulse`/`.seat-ripple` styles untouched
+- [ ] Full backend suite green; frontend build clean
+- [ ] API_CONTRACT.md updated

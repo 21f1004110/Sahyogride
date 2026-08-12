@@ -33,7 +33,7 @@ def main() -> None:
             origin="City Hospital",
             destination="Railway Station",
             departure_time=datetime.now(timezone.utc) + timedelta(days=1),
-            total_seats=4,
+            total_seats=40,
             purpose="medical",
         )
         db.add(trip)
