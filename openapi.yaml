@@ -1,0 +1,2034 @@
+openapi: 3.0.3
+
+info:
+  title: SahyogRide API
+  version: "1.1.0"
+  description: |
+    **SahyogRide** — Community shuttle booking platform.
+
+    NGOs/hospitals publish free shuttle trips for essential travel (medical, exams, work);
+    people in need reserve limited seats. Non-commercial — there is no payment.
+    The product's value is fair, error-free allocation of scarce free seats.
+
+    ---
+
+    ## Team
+    **Pixel Pioneers** | MAY2026-Team-078 | IIT Madras SE Course May 2026
+
+    | Member | Email |
+    |---|---|
+    | Vibhav Shukla *(Lead)* | 23f2003054@ds.study.iitm.ac.in |
+    | Siddharth Kumar Yadav | 23f1001362@ds.study.iitm.ac.in |
+    | Nilesh Mehra | 22f3002392@ds.study.iitm.ac.in |
+    | Navneet Kumar Yadav | 23f2002092@ds.study.iitm.ac.in |
+    | Aakash Kumar Katha | 21f1004110@ds.study.iitm.ac.in |
+
+    ---
+
+    ## User Story Mapping
+    | Ticket | Story | Endpoint(s) |
+    |---|---|---|
+    | SAHYOG-04 | Register & Login | `POST /auth/register`, `POST /auth/login` |
+    | SAHYOG-05 | Coordinator creates trip | `POST /trips` |
+    | SAHYOG-06 | Rider searches trips | `GET /trips` |
+    | SAHYOG-07 | Trip detail & seat map | `GET /trips/{id}` |
+    | SAHYOG-15 | hold_seat() with row locking | `POST /holds` (backend service) |
+    | SAHYOG-16 | Hold endpoint + frontend | `POST /holds` |
+    | SAHYOG-17 | Release hold | `DELETE /holds/{id}` |
+    | SAHYOG-18 | Confirm reservation | `POST /reservations` |
+    | SAHYOG-20 | Coordinator passenger list | `GET /trips/{id}/passengers` |
+    | SAHYOG-21 | Cancel reservation | `POST /reservations/{id}/cancel` |
+    | SAHYOG-22 | View my reservations | `GET /reservations/me` |
+    | SAHYOG-26 | AI semantic trip search | `GET /ai/search`, `POST /ai/search` |
+    | SAHYOG-30 | AI urgency triage badges | `GET /trips/{id}/passengers` (`ai_urgency_label`) |
+    | SAHYOG-31 | AI-generated trip summary | `GET /trips` / `GET /trips/{id}` (`ai_summary`) |
+    | SAHYOG-32 | Coordinator AI passenger digest | `GET /trips/{id}/passengers` (`digest`) |
+    | SAHYOG-38 | AI smart seat pick | `POST /trips/{id}/seat-recommendation` |
+    | SAHYOG-39 | AI similar-trip suggestions | `GET /trips/{id}/similar` |
+    | SAHYOG-40 | AI accessibility note classification | `POST /reservations` (`notes`), `GET /trips/{id}/passengers` (`ai_accessibility_tags`) |
+    | SAHYOG-42 | Trip high-demand flag | `GET /trips` / `GET /trips/mine` (`ai_high_demand`) |
+    | SAHYOG-43 | Capture passenger name & phone at booking | `POST /reservations` |
+    | SAHYOG-45 | AI help assistant | `POST /ai/assistant` |
+    | SAHYOG-46 | Coordinator bus stops & live vehicle position | `PUT /trips/{id}/stops`, `PATCH /trips/{id}/stops/current` |
+    | SAHYOG-47 | Origin/destination map on trip pages | `POST /trips` / `GET /trips/{id}` (`*_lat`, `*_lng`) |
+
+    ---
+
+    ## Authentication
+    All endpoints except `POST /auth/register` and `POST /auth/login` require:
+    ```
+    Authorization: Bearer <jwt>
+    ```
+    Missing or invalid token → **401 UNAUTHENTICATED**
+
+    ---
+
+    ## Error Envelope
+    Every non-2xx response uses this exact envelope (from `app/errors.py`):
+    ```json
+    { "error": { "code": "ERROR_CODE", "message": "Human readable.", "field": null } }
+    ```
+    `field` is set only for validation errors pointing at a specific request field.
+
+    ---
+
+    ## AI Features (6 total)
+    All AI calls are isolated to `app/services/ai_service.py`; every call has a 5s timeout
+    (`AI_TIMEOUT_SECONDS`) and returns `None` on failure/timeout/`AI_ENABLED=false` — the
+    caller always falls back to a deterministic, non-AI path and returns **HTTP 200**, never
+    a 5xx. The AI has zero write power everywhere: it parses, searches, classifies, and
+    summarises, but can never book, cancel, or modify anything.
+
+    1. **`GET /ai/search`, `POST /ai/search`** — pgvector semantic search (SAHYOG-26). Falls
+       back to tokenized keyword search if `AI_ENABLED=false` or the call fails.
+    2. **AI Trip Triage** (SAHYOG-30/31/42) — internal background task run after a
+       reservation commits; classifies urgency (`ai_urgency_label`), writes a one-line trip
+       summary (`ai_summary`), and flags unusually high demand (`ai_high_demand`).
+    3. **Embedding Backfill** — `backfill_embeddings.py` script, batch-generates 1536-dim
+       pgvector embeddings for existing trips.
+    4. **`POST /ai/assistant`** (SAHYOG-45) — general "how does this app work" help
+       assistant, no DB access, grounded on a fixed FAQ (also the deterministic fallback).
+    5. **`POST /trips/{id}/seat-recommendation`** (SAHYOG-38) — suggests one seat from a
+       free-text note (e.g. "wheelchair"). Read-only; the rider still has to click the seat
+       themselves. The AI's suggested seat is re-validated against currently-available seats
+       before being trusted — a hallucinated or now-taken seat falls back identically to
+       AI-off, never retried or remapped.
+    6. **AI Accessibility Note Classification** (SAHYOG-40) — internal background task that
+       classifies a rider's free-text accessibility note into one tag
+       (`ai_accessibility_tags`) for the coordinator's passenger list.
+
+    **Not a live AI call:** `GET /trips/{id}/similar` (SAHYOG-39) ranks other trips by
+    cosine distance against the already-populated `trips.embedding` column — pure pgvector
+    math, zero additional AI network calls. Falls back to a same-destination lookup when the
+    trip has no embedding yet or nothing clears `SEMANTIC_THRESHOLD`.
+
+    All AI features are isolated: the full booking flow (register → search → hold → confirm
+    → cancel) works identically with `AI_ENABLED=false`.
+
+servers:
+  - url: http://localhost:8000
+    description: Local development server (uvicorn --reload)
+
+tags:
+  - name: auth
+    description: |
+      User registration and JWT login.
+      **User story:** SAHYOG-04
+      Roles: `rider` | `coordinator` (admin cannot self-register)
+  - name: trips
+    description: |
+      Trip creation (coordinator-only), search, detail with seat map, the coordinator's own
+      trips, passenger list, AI seat suggestion, similar-trip suggestions, and coordinator-
+      managed bus stops / live vehicle position.
+      **User stories:** SAHYOG-05, SAHYOG-06, SAHYOG-07, SAHYOG-20, SAHYOG-38, SAHYOG-39,
+      SAHYOG-46, SAHYOG-47
+  - name: holds
+    description: |
+      Concurrency-safe seat holding using `SELECT ... FOR UPDATE` + `UNIQUE(seat_id)` constraint.
+      Hold TTL is configurable via `HOLD_TTL_MINUTES` env var (default 5 min).
+      **User stories:** SAHYOG-15, SAHYOG-16, SAHYOG-17
+  - name: reservations
+    description: |
+      Confirm a hold into a reservation (capturing passenger name/phone and an optional
+      accessibility note), cancel, and list the rider's own history.
+      **User stories:** SAHYOG-18, SAHYOG-21, SAHYOG-22, SAHYOG-40, SAHYOG-43
+  - name: ai
+    description: |
+      AI-powered semantic trip search (pgvector) and the rider help assistant. Both
+      gracefully degrade to a deterministic fallback when `AI_ENABLED=false` or the call
+      times out — always HTTP 200, never a 5xx.
+      **User stories:** SAHYOG-26, SAHYOG-45
+
+# ═══════════════════════════════════════════════════════════════
+# PATHS
+# ═══════════════════════════════════════════════════════════════
+paths:
+
+  # ─── AUTH ────────────────────────────────────────────────────
+
+  /auth/register:
+    post:
+      tags: [auth]
+      summary: Register a new user account
+      operationId: registerUser
+      description: |
+        Creates a new user and immediately returns a JWT.
+        `role` must be `rider` or `coordinator` — registering as `admin` is blocked by schema validator.
+        Password minimum length: 8 characters.
+        Email must contain `@` and a `.` after the `@`.
+
+        **User story:** SAHYOG-04
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+            examples:
+              rider:
+                summary: Register as rider
+                value:
+                  name: Asha Rao
+                  email: asha@example.com
+                  password: password123
+                  role: rider
+              coordinator:
+                summary: Register as coordinator
+                value:
+                  name: Priya NGO
+                  email: priya@ngo.org
+                  password: securepass
+                  role: coordinator
+      responses:
+        '201':
+          description: Account created, JWT returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              example:
+                token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwicm9sZSI6InJpZGVyIn0.sig
+                user:
+                  id: 1
+                  name: Asha Rao
+                  email: asha@example.com
+                  role: rider
+        '409':
+          description: Email already registered
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: EMAIL_TAKEN
+                  message: An account with this email already exists.
+                  field: email
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /auth/login:
+    post:
+      tags: [auth]
+      summary: Login and get a JWT
+      operationId: loginUser
+      description: |
+        Authenticates with email + password. Returns a fresh JWT.
+        Wrong credentials → 401 INVALID_CREDENTIALS.
+
+        **User story:** SAHYOG-04
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+            example:
+              email: asha@example.com
+              password: password123
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Wrong email or password
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: INVALID_CREDENTIALS
+                  message: Incorrect email or password.
+                  field: null
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  # ─── TRIPS ───────────────────────────────────────────────────
+
+  /trips:
+    post:
+      tags: [trips]
+      summary: Create a trip (coordinator only)
+      operationId: createTrip
+      description: |
+        Creates a shuttle trip and auto-generates `total_seats` Seat rows numbered "1"…"N".
+        Only coordinators may call this. Riders receive **403 FORBIDDEN_ROLE**.
+        Background task runs `run_trip_embedding()` after commit to generate a pgvector
+        embedding (SAHYOG-26) and an AI trip summary (SAHYOG-31) — never inside this
+        request's transaction.
+
+        `origin_lat`/`origin_lng`/`destination_lat`/`destination_lng` are optional
+        (SAHYOG-47) and purely for the rider-facing map — geocoded client-side (OpenStreetMap
+        Nominatim), never validated or geocoded by the backend.
+
+        **User story:** SAHYOG-05
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TripCreateRequest'
+            example:
+              origin: City Hospital
+              destination: Railway Station
+              departure_time: "2026-08-10T09:30:00Z"
+              total_seats: 40
+              purpose: medical
+              origin_lat: 28.6315
+              origin_lng: 77.2167
+              destination_lat: 28.5562
+              destination_lng: 77.1000
+      responses:
+        '201':
+          description: Trip created with seats auto-generated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripOut'
+              example:
+                id: 1
+                coordinator_id: 2
+                origin: City Hospital
+                destination: Railway Station
+                departure_time: "2026-08-10T09:30:00Z"
+                total_seats: 40
+                purpose: medical
+                origin_lat: 28.6315
+                origin_lng: 77.2167
+                destination_lat: 28.5562
+                destination_lng: 77.1000
+                created_at: "2026-08-02T08:45:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Caller is a rider, not a coordinator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: FORBIDDEN_ROLE
+                  message: You don't have permission to do this.
+                  field: null
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    get:
+      tags: [trips]
+      summary: Search available trips
+      operationId: searchTrips
+      description: |
+        Returns upcoming trips (newest departure last, capped at 50 results). All filters
+        are optional and combined with AND.
+        `origin` and `destination` are case-insensitive substring matches.
+        `date` filters by departure date (YYYY-MM-DD).
+        `q` is a natural-language keyword search (SAHYOG-06 + AI-search-fallback quality
+        improvement): matched as a whole-phrase substring against origin/destination/purpose,
+        AND word-by-word after dropping common filler words (e.g. "I need a ride to the
+        airport" matches a trip whose destination merely contains "airport").
+
+        **User story:** SAHYOG-06
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: origin
+          in: query
+          description: Case-insensitive substring match on trip origin
+          schema:
+            type: string
+          example: Hospital
+        - name: destination
+          in: query
+          description: Case-insensitive substring match on trip destination
+          schema:
+            type: string
+          example: Station
+        - name: date
+          in: query
+          description: Filter by departure date (YYYY-MM-DD)
+          schema:
+            type: string
+            format: date
+          example: "2026-08-10"
+        - name: q
+          in: query
+          description: Natural-language keyword search across origin, destination, and purpose
+          schema:
+            type: string
+          example: hospital trip tomorrow morning
+      responses:
+        '200':
+          description: Matching trips list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripListResponse'
+              example:
+                trips:
+                  - id: 1
+                    origin: City Hospital
+                    destination: Railway Station
+                    departure_time: "2026-08-10T09:30:00Z"
+                    total_seats: 40
+                    seats_available: 39
+                    purpose: medical
+                    ai_summary: A short medical shuttle from City Hospital to Railway Station.
+                    ai_high_demand: false
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /trips/mine:
+    get:
+      tags: [trips]
+      summary: List the authenticated coordinator's own trips
+      operationId: listMyTrips
+      description: |
+        Returns every trip published by the calling coordinator, most recently departing
+        first. Coordinator-only — riders receive **403 FORBIDDEN_ROLE**. Same
+        `ai_summary`/`ai_high_demand` fields as `GET /trips`.
+
+        **User story:** SAHYOG-42 (also backs the "My trips" page)
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Coordinator's own trips
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Caller is a rider, not a coordinator
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: FORBIDDEN_ROLE
+                  message: You don't have permission to do this.
+                  field: null
+
+  /trips/{id}:
+    get:
+      tags: [trips]
+      summary: Get trip detail with live seat map
+      operationId: getTripDetail
+      description: |
+        Returns full trip data plus every seat's current status, whether the calling
+        rider currently holds one of those seats (`held_by_me`), and the coordinator-set
+        bus-stop route / live vehicle position (SAHYOG-46).
+        Seat statuses: `available` | `held` | `reserved`.
+        Drives the interactive seat-map UI (SAHYOG-07).
+
+        **User story:** SAHYOG-07
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Trip ID
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Trip detail with seat statuses
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TripDetailOut'
+              example:
+                id: 1
+                coordinator_id: 2
+                origin: City Hospital
+                destination: Railway Station
+                departure_time: "2026-08-10T09:30:00Z"
+                total_seats: 4
+                purpose: medical
+                ai_summary: A short medical shuttle from City Hospital to Railway Station.
+                origin_lat: 28.6315
+                origin_lng: 77.2167
+                destination_lat: 28.5562
+                destination_lng: 77.1000
+                seats:
+                  - id: 1
+                    seat_number: "1"
+                    status: reserved
+                    held_by_me: false
+                  - id: 2
+                    seat_number: "2"
+                    status: held
+                    held_by_me: true
+                  - id: 3
+                    seat_number: "3"
+                    status: available
+                    held_by_me: false
+                  - id: 4
+                    seat_number: "4"
+                    status: available
+                    held_by_me: false
+                bus_stops:
+                  - id: 1
+                    name: City Hospital (boarding)
+                    sequence: 0
+                  - id: 2
+                    name: Railway Station (destination)
+                    sequence: 1
+                current_stop_sequence: 0
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /trips/{id}/passengers:
+    get:
+      tags: [trips]
+      summary: List a trip's confirmed passengers (coordinator only)
+      operationId: getTripPassengers
+      description: |
+        Returns every confirmed reservation on this trip, seat order, with the AI urgency
+        label (SAHYOG-30), AI accessibility tag (SAHYOG-40), and the passenger's captured
+        name/phone (SAHYOG-43). `digest` is a synchronous, read-only one-line coordinator
+        summary of the passenger mix (SAHYOG-32) — computed on the fly, not stored, and
+        `null` if there's nothing to summarise or AI is unavailable.
+        Coordinator-only, and only for a trip they published — **403 NOT_OWNER** otherwise.
+
+        **User story:** SAHYOG-20
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      responses:
+        '200':
+          description: Confirmed passenger list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PassengerListResponse'
+              example:
+                passengers:
+                  - reservation_id: 12
+                    rider_name: Asha Rao
+                    seat_number: "3"
+                    confirmed_at: "2026-08-10T09:32:00Z"
+                    ai_urgency_label: high
+                    ai_accessibility_tags: wheelchair
+                    passenger_name: Asha Rao
+                    passenger_phone: "9998887777"
+                digest: "3 of 4 seats confirmed, including 1 high-urgency rider."
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Caller is a rider, or a coordinator who doesn't own this trip
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: NOT_OWNER
+                  message: You don't have permission to access this resource.
+                  field: null
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /trips/{id}/seat-recommendation:
+    post:
+      tags: [trips]
+      summary: AI-suggest one seat from a free-text note (rider only)
+      operationId: recommendSeat
+      description: |
+        Suggests exactly one currently-available seat from a free-text note (e.g. "I use a
+        wheelchair", "travelling with a toddler") plus a one-line reason. Pure suggestion —
+        the rider still has to hold the suggested seat themselves via `POST /holds`; this
+        endpoint has **zero write power** and never calls `hold_seat()`.
+
+        The AI's suggested `seat_number` is re-validated against the trip's currently
+        available seats before being trusted. A mismatch (hallucination, race condition, or
+        `AI_ENABLED=false`/timeout) all fall back identically to the lowest-numbered
+        available seat, with `fallback: true` — never retried or remapped.
+        No seats available → `seat_number`/`reason` are both `null`, still HTTP 200.
+
+        **User story:** SAHYOG-38
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SeatRecommendationRequest'
+            example:
+              note: I use a wheelchair
+      responses:
+        '200':
+          description: Suggested seat (or deterministic fallback, or nulls if none available)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeatRecommendationResponse'
+              examples:
+                ai_suggested:
+                  summary: AI suggestion accepted
+                  value:
+                    seat_number: "5"
+                    reason: An aisle seat near the front for easier wheelchair access.
+                    fallback: false
+                fallback:
+                  summary: AI unavailable or hallucinated — deterministic fallback
+                  value:
+                    seat_number: "1"
+                    reason: Nearest available seat (AI suggestion unavailable).
+                    fallback: true
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Only riders can request a seat suggestion
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: FORBIDDEN_ROLE
+                  message: You don't have permission to do this.
+                  field: null
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /trips/{id}/similar:
+    get:
+      tags: [trips]
+      summary: Suggest similar trips (pgvector, no live AI call)
+      operationId: getSimilarTrips
+      description: |
+        Ranks other trips by cosine distance against this trip's already-populated
+        `trips.embedding` (from SAHYOG-26's post-commit background task) — pure pgvector
+        math against an existing column, **not** a new AI network call.
+
+        Falls back to a same-destination lookup (`fallback: true`) when this trip has no
+        embedding yet, or nothing clears `SEMANTIC_THRESHOLD`. Excludes the trip itself.
+
+        **User story:** SAHYOG-39
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+        - name: limit
+          in: query
+          description: Max number of similar trips to return
+          schema:
+            type: integer
+            default: 3
+          example: 3
+      responses:
+        '200':
+          description: Similar trips (or same-destination fallback, or empty)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SimilarTripsResponse'
+              example:
+                trips:
+                  - id: 4
+                    origin: General Hospital
+                    destination: Railway Station
+                    departure_time: "2026-08-11T09:00:00Z"
+                    total_seats: 40
+                    seats_available: 12
+                    purpose: medical
+                fallback: false
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /trips/{id}/stops:
+    put:
+      tags: [trips]
+      summary: Set a trip's bus-stop route (coordinator only)
+      operationId: setBusStops
+      description: |
+        Replaces the trip's entire ordered stop list in one call (simplest shape for a
+        coordinator filling in or editing a route). Resets `current_stop_sequence` to
+        `null` since the old index may no longer be valid against the new list. Plain
+        names only — no GPS/maps library involved in the stop list itself; map coordinates
+        are a separate, independent feature (SAHYOG-47).
+        Coordinator-only, and only for a trip they published — **403 NOT_OWNER** otherwise.
+
+        **User story:** SAHYOG-46
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetBusStopsRequest'
+            example:
+              stop_names:
+                - City Hospital (boarding)
+                - Main Market
+                - Railway Station (destination)
+      responses:
+        '200':
+          description: The trip's new bus-stop list, in order
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/BusStopOut'
+              example:
+                - id: 5
+                  name: City Hospital (boarding)
+                  sequence: 0
+                - id: 6
+                  name: Main Market
+                  sequence: 1
+                - id: 7
+                  name: Railway Station (destination)
+                  sequence: 2
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Caller is a rider, or a coordinator who doesn't own this trip
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: NOT_OWNER
+                  message: You don't have permission to access this resource.
+                  field: null
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /trips/{id}/stops/current:
+    patch:
+      tags: [trips]
+      summary: Set the vehicle's current stop (coordinator only)
+      operationId: setCurrentStop
+      description: |
+        Marks which stop the vehicle is currently at, by its zero-based `sequence` in the
+        route set via `PUT /trips/{id}/stops`. Riders see this update within their next
+        poll (`GET /trips/{id}`, every few seconds) on the "Live vehicle tracker" card.
+        `sequence` must reference a stop that exists on this trip's route, and the trip
+        must have a route configured — otherwise **422 VALIDATION_ERROR**.
+        Coordinator-only, and only for a trip they published — **403 NOT_OWNER** otherwise.
+
+        **User story:** SAHYOG-46
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+          example: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetCurrentStopRequest'
+            example:
+              sequence: 1
+      responses:
+        '200':
+          description: Updated current-stop status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusStopStatusResponse'
+              example:
+                stops:
+                  - id: 5
+                    name: City Hospital (boarding)
+                    sequence: 0
+                  - id: 6
+                    name: Main Market
+                    sequence: 1
+                  - id: 7
+                    name: Railway Station (destination)
+                    sequence: 2
+                current_stop_sequence: 1
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Caller is a rider, or a coordinator who doesn't own this trip
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: NOT_OWNER
+                  message: You don't have permission to access this resource.
+                  field: null
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '422':
+          description: No route configured yet, or sequence doesn't exist on this route
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                no_route:
+                  summary: Trip has no bus stops configured yet
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: This trip has no bus stops configured yet.
+                      field: null
+                bad_sequence:
+                  summary: sequence doesn't exist on this trip's route
+                  value:
+                    error:
+                      code: VALIDATION_ERROR
+                      message: That stop doesn't exist on this trip's route.
+                      field: null
+
+  # ─── HOLDS ───────────────────────────────────────────────────
+
+  /holds:
+    post:
+      tags: [holds]
+      summary: Hold a seat (concurrency-safe)
+      operationId: holdSeat
+      description: |
+        Atomically holds a seat using `SELECT ... FOR UPDATE` (row-level lock) so two
+        simultaneous callers on the same `seat_id` serialize. The `UNIQUE(seat_id)` on
+        the `holds` table is a second layer guard.
+
+        Business rules enforced:
+        - Seat must be `available` (or `held` with an expired hold, which is reclaimed inline)
+        - One active hold per rider per trip (`ALREADY_HOLDING`)
+        - Only riders may hold seats (`FORBIDDEN_ROLE`)
+
+        Hold TTL: `HOLD_TTL_MINUTES` env var (default 5 min).
+        A **409** here is expected (concurrency loser) — not a bug.
+        The frontend shows a calm message and refreshes the seat map.
+
+        **User stories:** SAHYOG-15, SAHYOG-16
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/HoldCreateRequest'
+            example:
+              seat_id: 3
+      responses:
+        '201':
+          description: Seat successfully held
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HoldOut'
+              example:
+                id: 7
+                seat_id: 3
+                trip_id: 1
+                rider_id: 5
+                expires_at: "2026-08-10T09:35:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Only riders can hold seats
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: FORBIDDEN_ROLE
+                  message: You don't have permission to do this.
+                  field: null
+        '404':
+          description: Seat not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: NOT_FOUND
+                  message: Resource not found.
+                  field: null
+        '409':
+          description: Seat unavailable or rider already holding on this trip
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              examples:
+                seat_unavailable:
+                  summary: Seat is already held or reserved
+                  value:
+                    error:
+                      code: SEAT_UNAVAILABLE
+                      message: That seat was just taken - please pick another one.
+                      field: null
+                already_holding:
+                  summary: Rider already holds a seat on this trip
+                  value:
+                    error:
+                      code: ALREADY_HOLDING
+                      message: You already hold a seat on this trip.
+                      field: null
+
+  /holds/{id}:
+    delete:
+      tags: [holds]
+      summary: Release a hold early
+      operationId: releaseHold
+      description: |
+        Frees the held seat back to `available` before the TTL expires.
+        Only the rider who placed the hold may release it (`NOT_OWNER`).
+        Returns `204 No Content` on success.
+
+        **User story:** SAHYOG-17
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Hold ID
+          schema:
+            type: integer
+          example: 7
+      responses:
+        '204':
+          description: Hold released successfully (no response body)
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Caller does not own this hold
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: NOT_OWNER
+                  message: You don't have permission to access this resource.
+                  field: null
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── RESERVATIONS ────────────────────────────────────────────
+
+  /reservations:
+    post:
+      tags: [reservations]
+      summary: Confirm a hold into a reservation
+      operationId: confirmReservation
+      description: |
+        Promotes an active hold to a confirmed reservation. Captures the passenger's name
+        and phone number (SAHYOG-43, both required — the coordinator needs a way to reach
+        the actual traveller) and an optional free-text accessibility note (SAHYOG-40),
+        e.g. "I use a wheelchair" — after commit, a background task classifies it into
+        `ai_accessibility_tags` for the coordinator's passenger list.
+
+        Returns **410 HOLD_EXPIRED** if `hold.expires_at <= now()`.
+        After commit, background task `run_reservation_triage()` runs AI urgency triage and
+        accessibility-note classification — never inside this request's transaction.
+        The seat's status changes from `held` → `reserved`.
+        Partial unique index `UNIQUE(seat_id) WHERE status='confirmed'` prevents double-booking.
+
+        **User stories:** SAHYOG-18, SAHYOG-40, SAHYOG-43
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ReservationCreateRequest'
+            example:
+              hold_id: 7
+              passenger_name: Asha Rao
+              passenger_phone: "9998887777"
+              notes: I use a wheelchair and need extra time boarding
+      responses:
+        '201':
+          description: Reservation confirmed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationOut'
+              example:
+                id: 12
+                seat_id: 3
+                trip_id: 1
+                rider_id: 5
+                status: confirmed
+                confirmed_at: "2026-08-10T09:32:00Z"
+                accessibility_note: I use a wheelchair and need extra time boarding
+                passenger_name: Asha Rao
+                passenger_phone: "9998887777"
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Caller does not own the hold
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: NOT_OWNER
+                  message: You don't have permission to access this resource.
+                  field: null
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          description: Hold has expired — rider must start again
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: HOLD_EXPIRED
+                  message: Your hold on this seat has expired.
+                  field: null
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /reservations/me:
+    get:
+      tags: [reservations]
+      summary: List my reservations (rider history)
+      operationId: listMyReservations
+      description: |
+        Returns all reservations for the authenticated rider, most recently confirmed first.
+        Includes both `confirmed` and `cancelled` statuses.
+
+        **User story:** SAHYOG-22
+      security:
+        - BearerAuth: []
+      responses:
+        '200':
+          description: Rider's reservation history
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationHistoryResponse'
+              example:
+                reservations:
+                  - id: 12
+                    trip_id: 1
+                    seat_number: "3"
+                    status: confirmed
+                    confirmed_at: "2026-08-10T09:32:00Z"
+                    cancelled_at: null
+                    trip_origin: City Hospital
+                    trip_destination: Railway Station
+                    departure_time: "2026-08-10T09:30:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+
+  /reservations/{id}/cancel:
+    post:
+      tags: [reservations]
+      summary: Cancel a reservation
+      operationId: cancelReservation
+      description: |
+        Cancels the reservation and frees the seat back to `available`.
+        Only the rider who made the reservation may cancel (`NOT_OWNER`).
+        Cancelling an already-cancelled reservation is a no-op that returns the existing
+        cancelled state (not an error) — `cancelled_at` is never overwritten on a repeat call.
+
+        **User story:** SAHYOG-21
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Reservation ID
+          schema:
+            type: integer
+          example: 12
+      responses:
+        '200':
+          description: Reservation cancelled, seat freed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReservationCancelOut'
+              example:
+                id: 12
+                status: cancelled
+                cancelled_at: "2026-08-10T09:40:00Z"
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '403':
+          description: Caller does not own this reservation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorEnvelope'
+              example:
+                error:
+                  code: NOT_OWNER
+                  message: You don't have permission to access this resource.
+                  field: null
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ─── AI ──────────────────────────────────────────────────────
+
+  /ai/search:
+    post:
+      tags: [ai]
+      summary: AI semantic trip search (pgvector) — JSON body
+      operationId: aiSearchTripsPost
+      description: |
+        Uses **pgvector** (1536-dim embeddings, `EMBEDDING_DIM = 1536`) to find trips
+        that semantically match a natural language query.
+
+        Flow:
+        1. Query is embedded using the configured AI model
+        2. Cosine similarity search against `trips.embedding` column
+        3. Results above `SEMANTIC_THRESHOLD` (default 0.5) are returned
+        4. Falls back to keyword search if `AI_ENABLED=false` or AI call times out (`AI_TIMEOUT_SECONDS`)
+
+        This endpoint has **zero write side effects** — read-only. The frontend's
+        `AssistantBox.jsx` uses this JSON-body form.
+
+        **User story:** SAHYOG-26
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AISearchRequest'
+            example:
+              query: hospital trip tomorrow morning
+      responses:
+        '200':
+          description: Semantically matched trips (or keyword fallback results)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AISearchResponse'
+              example:
+                trips:
+                  - id: 1
+                    origin: City Hospital
+                    destination: Railway Station
+                    departure_time: "2026-08-10T09:30:00Z"
+                fallback: false
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+    get:
+      tags: [ai]
+      summary: AI semantic trip search (pgvector) — query param alias
+      operationId: aiSearchTripsGet
+      description: |
+        GET alias for `POST /ai/search` using a `q` query parameter instead of a JSON body,
+        for clients/specs that expect a read-only GET for search. Same underlying service
+        and same fallback behaviour as the POST form.
+
+        **User story:** SAHYOG-26
+      security:
+        - BearerAuth: []
+      parameters:
+        - name: q
+          in: query
+          required: true
+          description: Natural language search query
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 500
+          examples:
+            medical:
+              summary: Hospital trip
+              value: hospital trip tomorrow morning
+            exam:
+              summary: Exam shuttle
+              value: free shuttle to university for exam
+      responses:
+        '200':
+          description: Semantically matched trips (or keyword fallback results)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AISearchResponse'
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+  /ai/assistant:
+    post:
+      tags: [ai]
+      summary: Ask the rider help assistant a question
+      operationId: askAssistant
+      description: |
+        General "how does this app work" help for any authenticated rider or coordinator —
+        e.g. "how do I cancel my booking?", "how can I track the vehicle?". Grounded on a
+        fixed FAQ; has **no database access at all** (not trip/reservation/account data), so
+        there is nothing for it to leak even under prompt injection, and it can never book,
+        cancel, or modify anything.
+
+        Falls back to a deterministic keyword match over the same FAQ (`fallback: true`)
+        when `AI_ENABLED=false`, unconfigured, or the call times out/fails — always HTTP
+        200, never a 5xx.
+
+        **User story:** SAHYOG-45
+      security:
+        - BearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssistantQuestionRequest'
+            example:
+              question: how can I track the vehicle?
+      responses:
+        '200':
+          description: Assistant's answer (AI-generated or deterministic FAQ fallback)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AssistantAnswerResponse'
+              example:
+                answer: >-
+                  Once your seat is confirmed, check the 'Live vehicle tracker' card on the
+                  confirmation page or on 'My reservations' - it shows the route and updates
+                  automatically every few seconds as the coordinator marks which stop the
+                  vehicle is currently at.
+                fallback: true
+        '401':
+          $ref: '#/components/responses/Unauthenticated'
+        '422':
+          $ref: '#/components/responses/ValidationError'
+
+# ═══════════════════════════════════════════════════════════════
+# COMPONENTS
+# ═══════════════════════════════════════════════════════════════
+components:
+
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        JWT token obtained from `POST /auth/register` or `POST /auth/login`.
+        Signed with `JWT_SECRET` env var using HS256 (python-jose).
+        Payload: `{ "sub": "<user_id>", "role": "<role>" }`
+
+  # ── SCHEMAS ─────────────────────────────────────────────────
+
+  schemas:
+
+    # ── Auth ──
+
+    RegisterRequest:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Display name
+          example: Asha Rao
+        email:
+          type: string
+          minLength: 3
+          maxLength: 255
+          description: Must contain @ and a dot after @
+          example: asha@example.com
+        password:
+          type: string
+          minLength: 8
+          maxLength: 255
+          description: Min 8 characters
+          example: password123
+        role:
+          $ref: '#/components/schemas/SelfRegisterRole'
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          example: asha@example.com
+        password:
+          type: string
+          example: password123
+
+    AuthResponse:
+      type: object
+      properties:
+        token:
+          type: string
+          description: JWT access token (HS256, python-jose)
+          example: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+        user:
+          $ref: '#/components/schemas/UserOut'
+
+    UserOut:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+          example: Asha Rao
+        email:
+          type: string
+          example: asha@example.com
+        role:
+          $ref: '#/components/schemas/UserRole'
+
+    # ── Trips ──
+
+    TripCreateRequest:
+      type: object
+      required: [origin, destination, departure_time, total_seats]
+      properties:
+        origin:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Free-text pickup location
+          example: City Hospital
+        destination:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Free-text drop-off location
+          example: Railway Station
+        departure_time:
+          type: string
+          format: date-time
+          description: ISO 8601 UTC timestamp
+          example: "2026-08-10T09:30:00Z"
+        total_seats:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Number of seats to auto-generate (labelled "1" to "N")
+          example: 40
+        purpose:
+          type: string
+          maxLength: 255
+          nullable: true
+          description: Free-text trip category (e.g. "medical", "exam", "work") — used by search, not a fixed enum
+          example: medical
+        origin_lat:
+          type: number
+          format: float
+          nullable: true
+          minimum: -90
+          maximum: 90
+          description: Optional, for the rider-facing map only (SAHYOG-47) — geocoded client-side, never validated server-side
+          example: 28.6315
+        origin_lng:
+          type: number
+          format: float
+          nullable: true
+          minimum: -180
+          maximum: 180
+          example: 77.2167
+        destination_lat:
+          type: number
+          format: float
+          nullable: true
+          minimum: -90
+          maximum: 90
+          example: 28.5562
+        destination_lng:
+          type: number
+          format: float
+          nullable: true
+          minimum: -180
+          maximum: 180
+          example: 77.1000
+
+    TripOut:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 1
+        coordinator_id:
+          type: integer
+          example: 2
+        origin:
+          type: string
+          example: City Hospital
+        destination:
+          type: string
+          example: Railway Station
+        departure_time:
+          type: string
+          format: date-time
+          example: "2026-08-10T09:30:00Z"
+        total_seats:
+          type: integer
+          example: 40
+        purpose:
+          type: string
+          nullable: true
+          example: medical
+        origin_lat:
+          type: number
+          format: float
+          nullable: true
+        origin_lng:
+          type: number
+          format: float
+          nullable: true
+        destination_lat:
+          type: number
+          format: float
+          nullable: true
+        destination_lng:
+          type: number
+          format: float
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+          example: "2026-08-02T08:45:00Z"
+
+    TripListItem:
+      type: object
+      description: Used by GET /trips, GET /trips/mine, and GET /trips/{id}/similar
+      properties:
+        id:
+          type: integer
+        origin:
+          type: string
+        destination:
+          type: string
+        departure_time:
+          type: string
+          format: date-time
+        total_seats:
+          type: integer
+        seats_available:
+          type: integer
+          description: Seats with status=available right now
+        purpose:
+          type: string
+          nullable: true
+        ai_summary:
+          type: string
+          nullable: true
+          description: One-line AI-generated trip summary (SAHYOG-31), written by a post-commit background task. Null until generated or if AI is unavailable.
+        ai_high_demand:
+          type: boolean
+          nullable: true
+          description: Flagged by the same background task when demand is unusually high (SAHYOG-42)
+
+    TripListResponse:
+      type: object
+      properties:
+        trips:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripListItem'
+
+    SeatOut:
+      type: object
+      description: Individual seat with live status
+      properties:
+        id:
+          type: integer
+          example: 3
+        seat_number:
+          type: string
+          description: Human-readable label (e.g. "1", "2", "3")
+          example: "3"
+        status:
+          $ref: '#/components/schemas/SeatStatus'
+        held_by_me:
+          type: boolean
+          description: True if the calling rider currently holds this exact seat — always trust this field over any client-side state
+          example: false
+
+    BusStopOut:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 5
+        name:
+          type: string
+          example: City Hospital (boarding)
+        sequence:
+          type: integer
+          description: Zero-based position in the route
+          example: 0
+
+    TripDetailOut:
+      type: object
+      description: Full trip data plus per-seat status map and live bus-stop position (SAHYOG-07, SAHYOG-46)
+      properties:
+        id:
+          type: integer
+          example: 1
+        coordinator_id:
+          type: integer
+          example: 2
+        origin:
+          type: string
+          example: City Hospital
+        destination:
+          type: string
+          example: Railway Station
+        departure_time:
+          type: string
+          format: date-time
+          example: "2026-08-10T09:30:00Z"
+        total_seats:
+          type: integer
+          example: 4
+        purpose:
+          type: string
+          nullable: true
+          example: medical
+        ai_summary:
+          type: string
+          nullable: true
+        origin_lat:
+          type: number
+          format: float
+          nullable: true
+        origin_lng:
+          type: number
+          format: float
+          nullable: true
+        destination_lat:
+          type: number
+          format: float
+          nullable: true
+        destination_lng:
+          type: number
+          format: float
+          nullable: true
+        seats:
+          type: array
+          items:
+            $ref: '#/components/schemas/SeatOut'
+          description: All seats ordered by seat_number
+        bus_stops:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusStopOut'
+          description: Coordinator-set route, ordered by sequence. Empty if not configured.
+        current_stop_sequence:
+          type: integer
+          nullable: true
+          description: Zero-based sequence of the stop the vehicle is currently at. Null if not yet set.
+
+    SetBusStopsRequest:
+      type: object
+      required: [stop_names]
+      properties:
+        stop_names:
+          type: array
+          minItems: 1
+          maxItems: 20
+          items:
+            type: string
+            maxLength: 255
+          example: [City Hospital (boarding), Main Market, Railway Station (destination)]
+
+    SetCurrentStopRequest:
+      type: object
+      required: [sequence]
+      properties:
+        sequence:
+          type: integer
+          minimum: 0
+          description: Zero-based index into the trip's stop list
+          example: 1
+
+    BusStopStatusResponse:
+      type: object
+      properties:
+        stops:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusStopOut'
+        current_stop_sequence:
+          type: integer
+          nullable: true
+
+    # ── Passenger List (coordinator) ──
+
+    PassengerItem:
+      type: object
+      properties:
+        reservation_id:
+          type: integer
+          example: 12
+        rider_name:
+          type: string
+          description: Name on the rider's account
+          example: Asha Rao
+        seat_number:
+          type: string
+          example: "3"
+        confirmed_at:
+          type: string
+          format: date-time
+          example: "2026-08-10T09:32:00Z"
+        ai_urgency_label:
+          type: string
+          nullable: true
+          enum: [high, medium, low]
+          description: Written by a post-commit background task (SAHYOG-30). Null until classified or if AI is unavailable.
+          example: high
+        ai_accessibility_tags:
+          type: string
+          nullable: true
+          enum: [wheelchair, mobility_assistance, visual_impairment, hearing_impairment, elderly_support, child_support, other]
+          description: Classified from the rider's free-text accessibility note by the same background task (SAHYOG-40). Despite the plural name, exactly one tag.
+          example: wheelchair
+        passenger_name:
+          type: string
+          nullable: true
+          description: Captured at booking time (SAHYOG-43) — the actual traveller, which may differ from the account holder
+          example: Asha Rao
+        passenger_phone:
+          type: string
+          nullable: true
+          example: "9998887777"
+
+    PassengerListResponse:
+      type: object
+      properties:
+        passengers:
+          type: array
+          items:
+            $ref: '#/components/schemas/PassengerItem'
+        digest:
+          type: string
+          nullable: true
+          description: One-line AI summary of the passenger mix (SAHYOG-32), computed synchronously and read-only per request — not stored. Null if there's nothing to summarise or AI is unavailable.
+          example: "3 of 4 seats confirmed, including 1 high-urgency rider."
+
+    # ── AI Seat Recommendation ──
+
+    SeatRecommendationRequest:
+      type: object
+      required: [note]
+      properties:
+        note:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Free-text description of what the rider needs
+          example: I use a wheelchair
+
+    SeatRecommendationResponse:
+      type: object
+      properties:
+        seat_number:
+          type: string
+          nullable: true
+          description: Null only if the trip has no available seats at all
+          example: "5"
+        reason:
+          type: string
+          nullable: true
+          example: An aisle seat near the front for easier wheelchair access.
+        fallback:
+          type: boolean
+          description: True if this is the deterministic nearest-available-seat fallback rather than an AI suggestion
+          example: false
+
+    # ── Similar Trips ──
+
+    SimilarTripsResponse:
+      type: object
+      properties:
+        trips:
+          type: array
+          items:
+            $ref: '#/components/schemas/TripListItem'
+        fallback:
+          type: boolean
+          description: True if this is the same-destination fallback rather than an embedding-based match
+
+    # ── Holds ──
+
+    HoldCreateRequest:
+      type: object
+      required: [seat_id]
+      properties:
+        seat_id:
+          type: integer
+          description: ID of the seat to hold (must be status=available)
+          example: 3
+
+    HoldOut:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 7
+        seat_id:
+          type: integer
+          example: 3
+        trip_id:
+          type: integer
+          description: Denormalised for convenience — matches seat.trip_id
+          example: 1
+        rider_id:
+          type: integer
+          example: 5
+        expires_at:
+          type: string
+          format: date-time
+          description: UTC expiry time (now + HOLD_TTL_MINUTES)
+          example: "2026-08-10T09:35:00Z"
+
+    # ── Reservations ──
+
+    ReservationCreateRequest:
+      type: object
+      required: [hold_id, passenger_name, passenger_phone]
+      properties:
+        hold_id:
+          type: integer
+          description: ID of the active (non-expired) hold to confirm
+          example: 7
+        passenger_name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          description: Name of the person actually travelling (SAHYOG-43) — may differ from the account holder
+          example: Asha Rao
+        passenger_phone:
+          type: string
+          minLength: 7
+          maxLength: 20
+          description: So the trip's coordinator can reach the passenger (SAHYOG-43)
+          example: "9998887777"
+        notes:
+          type: string
+          nullable: true
+          maxLength: 500
+          description: Optional free-text accessibility note (SAHYOG-40), e.g. "I use a wheelchair" — classified into a tag by a post-commit background task
+          example: I use a wheelchair and need extra time boarding
+
+    ReservationOut:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12
+        seat_id:
+          type: integer
+          example: 3
+        trip_id:
+          type: integer
+          example: 1
+        rider_id:
+          type: integer
+          example: 5
+        status:
+          $ref: '#/components/schemas/ReservationStatus'
+        confirmed_at:
+          type: string
+          format: date-time
+          example: "2026-08-10T09:32:00Z"
+        accessibility_note:
+          type: string
+          nullable: true
+          example: I use a wheelchair and need extra time boarding
+        passenger_name:
+          type: string
+          nullable: true
+          example: Asha Rao
+        passenger_phone:
+          type: string
+          nullable: true
+          example: "9998887777"
+
+    ReservationHistoryItem:
+      type: object
+      description: One rider's reservation with denormalised trip info for display — distinct shape from ReservationOut (seat_number, not seat_id/rider_id)
+      properties:
+        id:
+          type: integer
+          example: 12
+        trip_id:
+          type: integer
+          example: 1
+        seat_number:
+          type: string
+          example: "3"
+        status:
+          $ref: '#/components/schemas/ReservationStatus'
+        confirmed_at:
+          type: string
+          format: date-time
+          example: "2026-08-10T09:32:00Z"
+        cancelled_at:
+          type: string
+          format: date-time
+          nullable: true
+          example: null
+        trip_origin:
+          type: string
+          example: City Hospital
+        trip_destination:
+          type: string
+          example: Railway Station
+        departure_time:
+          type: string
+          format: date-time
+          example: "2026-08-10T09:30:00Z"
+
+    ReservationHistoryResponse:
+      type: object
+      properties:
+        reservations:
+          type: array
+          items:
+            $ref: '#/components/schemas/ReservationHistoryItem'
+
+    ReservationCancelOut:
+      type: object
+      properties:
+        id:
+          type: integer
+          example: 12
+        status:
+          type: string
+          enum: [cancelled]
+          example: cancelled
+        cancelled_at:
+          type: string
+          format: date-time
+          example: "2026-08-10T09:40:00Z"
+
+    # ── AI Search ──
+
+    AISearchRequest:
+      type: object
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 500
+          description: Natural language query
+          example: hospital trip tomorrow morning
+
+    AISearchTripItem:
+      type: object
+      description: Deliberately lean — just enough to link to the full trip via GET /trips/{id}
+      properties:
+        id:
+          type: integer
+        origin:
+          type: string
+        destination:
+          type: string
+        departure_time:
+          type: string
+          format: date-time
+
+    AISearchResponse:
+      type: object
+      properties:
+        trips:
+          type: array
+          items:
+            $ref: '#/components/schemas/AISearchTripItem'
+        fallback:
+          type: boolean
+          description: true if this is the deterministic keyword-search fallback rather than an embedding-based match
+          example: false
+
+    # ── AI Rider Assistant ──
+
+    AssistantQuestionRequest:
+      type: object
+      required: [question]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 300
+          example: how can I track the vehicle?
+
+    AssistantAnswerResponse:
+      type: object
+      properties:
+        answer:
+          type: string
+          example: >-
+            Once your seat is confirmed, check the 'Live vehicle tracker' card on the
+            confirmation page or on 'My reservations'.
+        fallback:
+          type: boolean
+          description: true if this is the deterministic FAQ keyword-match fallback rather than an AI-generated answer
+          example: true
+
+    # ── Shared Enums ──
+
+    UserRole:
+      type: string
+      description: |
+        User role stored in DB as lowercase value.
+        `admin` cannot be self-registered (blocked by RegisterRequest validator).
+      enum: [rider, coordinator, admin]
+      example: rider
+
+    SelfRegisterRole:
+      type: string
+      description: Only `rider` or `coordinator` allowed during self-registration
+      enum: [rider, coordinator]
+      example: rider
+
+    SeatStatus:
+      type: string
+      description: |
+        Live seat status:
+        - `available` — can be held
+        - `held` — locked by a rider for up to HOLD_TTL_MINUTES
+        - `reserved` — confirmed booking, seat taken
+      enum: [available, held, reserved]
+      example: available
+
+    ReservationStatus:
+      type: string
+      description: Reservation lifecycle status
+      enum: [confirmed, cancelled]
+      example: confirmed
+
+    # ── Error Envelope ──
+
+    ErrorEnvelope:
+      type: object
+      description: |
+        Standard error response from `app/errors.py`.
+        All non-2xx responses use this exact shape — no exceptions.
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, field]
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+              example: SEAT_UNAVAILABLE
+            message:
+              type: string
+              description: Human-readable message (from ERROR_CODES in errors.py)
+              example: That seat was just taken - please pick another one.
+            field:
+              type: string
+              nullable: true
+              description: Request field that caused the error (validation only); otherwise null
+              example: null
+
+  # ── REUSABLE RESPONSES ──────────────────────────────────────
+
+  responses:
+
+    Unauthenticated:
+      description: Missing or invalid JWT (401)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: UNAUTHENTICATED
+              message: Authentication required.
+              field: null
+
+    NotFound:
+      description: Resource not found (404)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: NOT_FOUND
+              message: Resource not found.
+              field: null
+
+    ValidationError:
+      description: Request body / query param failed schema validation (422)
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorEnvelope'
+          example:
+            error:
+              code: VALIDATION_ERROR
+              message: Request validation failed.
+              field: email
