@@ -1,0 +1,743 @@
+meta:
+  project: SahyogRide
+  description: >
+    Community shuttle booking platform. NGOs/hospitals publish free shuttle
+    trips for essential travel (medical, exams, work); people in need
+    reserve limited seats. Non-commercial - there is no payment.
+  version: "1.0.0"
+  scope: >
+    Every end-to-end use case supported by the current codebase, spanning
+    both the FastAPI backend and the React frontend. Complements
+    openapi.yaml (the API request/response contract) - this file describes
+    *why* and *when* each endpoint/page is used, by whom, and what happens
+    on success, failure, and at the edges.
+  actors:
+    - id: guest
+      description: Not logged in. Can only reach the landing page, register, and login.
+    - id: rider
+      description: Searches trips, holds/confirms/cancels seats, tracks the vehicle, uses the AI assistant.
+    - id: coordinator
+      description: Publishes trips, manages the bus-stop route and live position, views the passenger list.
+    - id: admin
+      description: Exists in the data model (UserRole enum) but has no self-registration path and no dedicated UI in the current app - reserved for future use.
+  related_docs:
+    - openapi.yaml
+    - docs/API_CONTRACT.md
+    - docs/ER_DIAGRAM.md
+    - CLAUDE.md
+  non_negotiables:
+    # The three rules every use case below must respect - see CLAUDE.md.
+    - A seat can never be double-booked, even under simultaneous holds (row lock + two UNIQUE constraints).
+    - No AI call ever runs inside the hold/confirm locked transaction; AI always fires after commit, as a background task, or as a separate read-only endpoint.
+    - Every core flow (register, search, hold, confirm, cancel) works identically with AI_ENABLED=false - every AI-backed use case documents its non-AI fallback.
+
+use_cases:
+
+  # ─── AUTHENTICATION & ACCESS ────────────────────────────────────────
+
+  - id: UC-01
+    title: Visitor views the public landing page
+    category: frontend
+    actors: [guest]
+    tickets: []
+    preconditions:
+      - User is not authenticated.
+    trigger: User navigates to "/".
+    main_flow:
+      - Frontend router (RootRoute) checks auth state; unauthenticated users render Landing.jsx instead of Dashboard.
+      - Landing page explains the platform, shows how-it-works steps, a live (non-interactive) seat map preview, trust badges, testimonials, and an FAQ.
+      - User clicks "Get started" (register) or "I already have an account" (login).
+    postconditions:
+      - No account or session created yet; user is routed to /register or /login.
+    related:
+      frontend: [pages/Landing.jsx, components/SeatMap.jsx (preview data)]
+      backend_endpoints: []
+
+  - id: UC-02
+    title: New user registers an account
+    category: full-stack
+    actors: [guest]
+    tickets: [SAHYOG-04]
+    preconditions:
+      - Email not already registered.
+    trigger: User submits the registration form choosing role "rider" or "coordinator".
+    main_flow:
+      - Frontend validates required fields client-side (Register.jsx).
+      - POST /auth/register creates the user (bcrypt-hashed password) and returns a JWT + user object.
+      - Frontend stores the token, updates AuthContext, and redirects to "/" (Dashboard).
+    alternate_flows:
+      - Email already taken -> 409 EMAIL_TAKEN, shown inline via ErrorState.
+      - role is "admin" -> rejected by RegisterRequest's validator before it reaches the DB (self-registration as admin is blocked).
+      - Password under 8 characters, or email missing "@"/a dot -> 422 VALIDATION_ERROR with the offending field.
+    postconditions:
+      - A new User row exists; rider/coordinator is immediately logged in.
+    related:
+      frontend: [pages/Register.jsx, components/AuthLayout.jsx, context/AuthContext.jsx]
+      backend_endpoints: [POST /auth/register]
+
+  - id: UC-03
+    title: Returning user logs in
+    category: full-stack
+    actors: [guest]
+    tickets: [SAHYOG-04]
+    preconditions:
+      - An account already exists.
+    trigger: User submits email + password on the login form.
+    main_flow:
+      - POST /auth/login verifies the bcrypt hash and returns a fresh JWT + user object.
+      - Frontend stores the token/user, redirects to "/".
+    alternate_flows:
+      - Wrong email or password -> 401 INVALID_CREDENTIALS, shown inline.
+    postconditions:
+      - User session established; role-gated navigation (rider vs coordinator links) appears in the header.
+    related:
+      frontend: [pages/Login.jsx, context/AuthContext.jsx]
+      backend_endpoints: [POST /auth/login]
+
+  - id: UC-04
+    title: User logs out
+    category: frontend
+    actors: [rider, coordinator]
+    tickets: []
+    preconditions:
+      - User is authenticated.
+    trigger: User clicks the logout icon in the header (Layout.jsx).
+    main_flow:
+      - AuthContext clears the stored token/user from localStorage and app state.
+      - User is redirected to the (now-unauthenticated) landing page.
+    postconditions:
+      - JWT is discarded client-side; no server-side session to invalidate (stateless JWT).
+    related:
+      frontend: [components/Layout.jsx, context/AuthContext.jsx]
+      backend_endpoints: []
+
+  - id: UC-05
+    title: Unauthenticated or wrong-role access to a protected page is blocked
+    category: full-stack
+    actors: [guest, rider, coordinator]
+    tickets: [SAHYOG-04, SAHYOG-05]
+    preconditions:
+      - User is either logged out, or logged in with the wrong role for the target page.
+    trigger: User navigates directly (e.g. deep link) to a route like "/trips/new" or "/my-trips".
+    main_flow:
+      - RequireAuth/RequireCoordinator route guards check auth state and role before rendering.
+      - Not logged in -> redirected to "/login". Logged in but wrong role (e.g. a rider hitting a coordinator-only route) -> redirected to "/".
+      - If the guard is somehow bypassed (e.g. direct API call), the backend's own require_role dependency independently returns 401 UNAUTHENTICATED or 403 FORBIDDEN_ROLE - the frontend guard is a UX convenience, never the actual security boundary.
+    postconditions:
+      - No unauthorized page render or API mutation occurs.
+    related:
+      frontend: [App.jsx (RequireAuth, RequireCoordinator)]
+      backend_endpoints: [applies to every non-auth endpoint via app/deps.py]
+
+  # ─── TRIP DISCOVERY & SEARCH (RIDER) ────────────────────────────────
+
+  - id: UC-06
+    title: Rider searches for trips by origin, destination, date, and/or keyword
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-06]
+    preconditions:
+      - Rider is authenticated.
+    trigger: Rider fills in any combination of filters on the Search trips page and submits.
+    main_flow:
+      - GET /trips with optional origin/destination (case-insensitive substring), date (exact day), and q (natural-language keyword) query params, all AND-combined.
+      - Keyword search matches the whole phrase as a substring AND tokenizes it (dropping filler words like "a"/"the"/"to") so "I need a ride to the airport" still matches a trip whose destination merely contains "airport".
+      - Results (capped at 50, ordered by departure time) render as cards with a seat-availability bar, AI summary (if generated), and purpose tag.
+    alternate_flows:
+      - No filters set -> returns all upcoming trips (still capped at 50).
+      - No matches -> Empty state with a helpful message, not a blank page.
+    postconditions:
+      - None (read-only).
+    related:
+      frontend: [pages/SearchTrips.jsx, components/states/Empty.jsx]
+      backend_endpoints: [GET /trips]
+
+  - id: UC-07
+    title: Rider asks the AI assistant to find a trip in natural language
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-26]
+    preconditions:
+      - Rider is authenticated.
+    trigger: Rider types a free-text query into the AssistantBox on the Search page.
+    main_flow:
+      - POST /ai/search embeds the query and ranks trips by cosine similarity against trips.embedding (pgvector), returning matches above SEMANTIC_THRESHOLD.
+      - Frontend renders the matched trips with a fallback=false indicator when the AI path was used.
+    alternate_flows:
+      - AI_ENABLED=false, no AI_API_KEY, or the call times out (AI_TIMEOUT_SECONDS) -> falls back to the same tokenized keyword search as UC-06, fallback=true, still HTTP 200 (never a 5xx).
+    postconditions:
+      - None (read-only, zero write side effects by design).
+    related:
+      frontend: [components/AssistantBox.jsx]
+      backend_endpoints: [POST /ai/search, GET /ai/search]
+
+  - id: UC-08
+    title: Rider opens a trip's detail page and sees the live seat map
+    category: full-stack
+    actors: [rider, coordinator]
+    tickets: [SAHYOG-07, SAHYOG-36, SAHYOG-37]
+    preconditions:
+      - Trip exists.
+    trigger: Rider clicks a trip card, or navigates directly to "/trips/:id".
+    main_flow:
+      - GET /trips/:id returns full trip data, every seat's live status (available/held/reserved), whether the CALLING rider currently holds a specific seat (held_by_me), and the bus-stop route/current position if configured.
+      - Seat map renders as a bus-shaped grid (rows of 4, aisle in the middle), each seat a chair icon (outline = available, filled = reserved, outline + clock badge = held) - status is never colour-alone, per accessibility rules.
+      - Page polls every 5 seconds so the seat map stays live for every viewer without a manual refresh.
+    alternate_flows:
+      - Trip has zero seats (data anomaly) -> Empty state, not a crash.
+      - Trip not found -> 404 NOT_FOUND -> ErrorState with retry.
+    postconditions:
+      - None (read-only render; polling continues while the page is open).
+    related:
+      frontend: [pages/TripDetail.jsx, components/SeatMap.jsx, components/Seat.jsx, components/SeatIcon.jsx]
+      backend_endpoints: ["GET /trips/{id}"]
+
+  - id: UC-09
+    title: Rider views an optional origin/destination map on the trip page
+    category: full-stack
+    actors: [rider, coordinator]
+    tickets: [SAHYOG-47]
+    preconditions:
+      - The trip's coordinator set origin/destination map coordinates when creating it (optional, nullable).
+    trigger: Rider opens a trip that has origin_lat/lng and/or destination_lat/lng set.
+    main_flow:
+      - GeoMap.jsx renders a Leaflet map (OpenStreetMap tiles) with origin/destination markers and a dashed route line, embedded inside the "Live vehicle tracker" card.
+      - If a bus-stop route + current position is also configured, an animated vehicle marker eases along the route between stops (see UC-20).
+    alternate_flows:
+      - Neither coordinate is set -> the map section doesn't render at all; the rest of the page (seat map, tracker stop list) is unaffected.
+    postconditions:
+      - None (read-only display layer; backend never reads or validates these coordinates).
+    related:
+      frontend: [components/GeoMap.jsx, components/BusStopTracker.jsx]
+      backend_endpoints: ["GET /trips/{id}"]
+
+  - id: UC-10
+    title: Rider requests an AI seat suggestion from a free-text note
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-38]
+    preconditions:
+      - Rider is viewing a trip with at least one available seat.
+    trigger: Rider types a note (e.g. "I use a wheelchair", "travelling with a toddler") and taps "Suggest".
+    main_flow:
+      - POST /trips/{id}/seat-recommendation fetches currently-available seats, describes each seat's position (row/side/window-or-aisle) to the AI, and asks it to pick one plus a one-line reason.
+      - The AI's chosen seat_number is re-validated against the *live* available set before being trusted.
+      - Frontend highlights the suggested seat on the map with a distinct ring/badge and shows the reason text. The rider must still click the seat themselves to hold it - the endpoint has zero write power.
+    alternate_flows:
+      - AI off/unconfigured/timeout, or the AI names a seat that's no longer available (hallucination or race condition) -> deterministic fallback to the lowest-numbered available seat, fallback=true, still HTTP 200.
+      - No seats available at all -> seat_number and reason are both null, still HTTP 200.
+      - Coordinator attempts this -> 403 FORBIDDEN_ROLE (rider-only feature).
+    postconditions:
+      - No seat is held or modified by this call under any outcome.
+    related:
+      frontend: [pages/TripDetail.jsx (seat-suggestion card), components/SeatMap.jsx]
+      backend_endpoints: ["POST /trips/{id}/seat-recommendation"]
+
+  - id: UC-11
+    title: Rider sees similar-trip suggestions
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-39]
+    preconditions:
+      - Rider is on a trip detail page.
+    trigger: Page load (fetched automatically alongside the trip detail).
+    main_flow:
+      - GET /trips/{id}/similar ranks other trips by cosine distance against this trip's already-populated embedding column - pure pgvector math, not a new live AI call.
+      - Matches within SEMANTIC_THRESHOLD render as a small card list below the seat map.
+    alternate_flows:
+      - This trip has no embedding yet, or nothing clears the threshold -> falls back to a same-destination lookup, fallback=true.
+      - No fallback matches either -> the section simply doesn't render (empty trips list).
+    postconditions:
+      - None (read-only).
+    related:
+      frontend: [components/SimilarTrips.jsx]
+      backend_endpoints: ["GET /trips/{id}/similar"]
+
+  # ─── SEAT HOLDING & CONCURRENCY (THE CORE) ──────────────────────────
+
+  - id: UC-12
+    title: Rider holds an available seat
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-15, SAHYOG-16]
+    preconditions:
+      - Seat status is "available" (or "held" with an already-expired hold).
+      - Rider does not already hold a different seat on this same trip.
+    trigger: Rider taps an available seat on the seat map.
+    main_flow:
+      - POST /holds takes a SELECT ... FOR UPDATE row lock on the seat, reclaims an expired hold inline if present, creates a Hold row (expires in HOLD_TTL_MINUTES, default 5), and flips the seat to "held".
+      - Frontend shows a live countdown (HoldCountdown.jsx) and a form for passenger name/phone + optional accessibility note.
+    alternate_flows:
+      - Seat was just taken by someone else (lost the race) -> 409 SEAT_UNAVAILABLE - shown as a calm "that seat was just taken, pick another" message, never a scary red error; seat map refreshes.
+      - Rider already holds a different seat on this trip -> 409 ALREADY_HOLDING.
+      - Coordinator attempts this -> 403 FORBIDDEN_ROLE.
+    postconditions:
+      - Exactly one Hold row exists for this seat; seat.status == "held" for every other viewer.
+    related:
+      frontend: [pages/TripDetail.jsx, components/HoldCountdown.jsx]
+      backend_endpoints: [POST /holds]
+
+  - id: UC-13
+    title: Two riders race to hold the same seat at the same instant
+    category: backend
+    actors: [rider]
+    tickets: [SAHYOG-15]
+    preconditions:
+      - Seat is available; two different riders click it within milliseconds of each other.
+    trigger: Concurrent POST /holds requests for the same seat_id.
+    main_flow:
+      - Both requests attempt SELECT ... FOR UPDATE on the same seat row; the database serializes them - the second request blocks until the first commits.
+      - Winner: seat flips to "held", gets 201.
+      - Loser: re-reads the now-"held" status after the lock releases, gets 409 SEAT_UNAVAILABLE.
+      - UNIQUE(seat_id) on the holds table is a second, independent guard against the same failure mode.
+    postconditions:
+      - Exactly one Hold row for the seat, always - this is the star test (test_two_riders_one_seat_only_one_wins, run 50 iterations with zero failures).
+    related:
+      frontend: []
+      backend_endpoints: [POST /holds]
+
+  - id: UC-14
+    title: A hold expires before the rider confirms
+    category: backend
+    actors: [rider]
+    tickets: [SAHYOG-15, SAHYOG-18, SAHYOG-19]
+    preconditions:
+      - A Hold's expires_at has passed and no confirmation happened.
+    trigger: Either (a) a background sweep (release_expired_holds) runs periodically, or (b) another rider tries to hold the same seat before the sweep gets to it.
+    main_flow:
+      - The sweep deletes expired Hold rows and flips their seats back to "available" for every passive viewer.
+      - hold_seat() also reclaims a stale hold inline for whoever tries to grab that exact seat next, so they don't have to wait on the periodic sweep.
+      - If the original rider tries to confirm anyway -> 410 HOLD_EXPIRED, frontend clears the hold state and tells them to pick a seat again.
+    postconditions:
+      - Seat is available again; no orphaned Hold rows survive past their TTL.
+    related:
+      frontend: [pages/TripDetail.jsx (confirmError message)]
+      backend_endpoints: [POST /reservations (410 case)]
+
+  - id: UC-15
+    title: Rider releases a held seat before confirming
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-17]
+    preconditions:
+      - Rider currently holds a seat.
+    trigger: Rider clicks "Release seat".
+    main_flow:
+      - DELETE /holds/{id} deletes the hold and flips the seat back to "available" (204 No Content).
+      - Frontend clears the active-hold UI, seat map updates.
+    alternate_flows:
+      - Rider tries to release a hold they don't own -> 403 NOT_OWNER.
+      - Hold ID doesn't exist -> 404 NOT_FOUND.
+    postconditions:
+      - Seat is immediately available to other riders.
+    related:
+      frontend: [pages/TripDetail.jsx]
+      backend_endpoints: ["DELETE /holds/{id}"]
+
+  - id: UC-16
+    title: Rider confirms a hold into a reservation
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-18, SAHYOG-40, SAHYOG-43]
+    preconditions:
+      - Rider currently holds a non-expired seat.
+      - Passenger name and a phone number (>= 7 digits) are entered - both required.
+    trigger: Rider fills in passenger name/phone (+ optional accessibility note) and clicks "Confirm reservation".
+    main_flow:
+      - POST /reservations locks the hold row, verifies it hasn't expired, creates a Reservation, deletes the hold, and flips the seat to "reserved" - all in one transaction, zero AI calls.
+      - After the response is sent, a background task classifies urgency and (if a note was given) the accessibility tag - never inside the booking transaction.
+      - Frontend navigates to the Confirmation page with a brief celebratory animation.
+    alternate_flows:
+      - Hold expired between holding and confirming -> 410 HOLD_EXPIRED (see UC-14).
+      - Rider doesn't own the hold -> 403 NOT_OWNER.
+      - Phone number under 7 digits, or name blank -> 422 VALIDATION_ERROR on the specific field.
+      - A second confirmation is attempted on an already-confirmed hold (double-submit) -> the hold row no longer exists -> 404 NOT_FOUND, or the partial unique index on reservations rejects a genuine double-booking race with 409 SEAT_UNAVAILABLE.
+    postconditions:
+      - Exactly one confirmed Reservation for the seat; confirmed reservations for a trip never exceed total_seats.
+    related:
+      frontend: [pages/TripDetail.jsx, pages/Confirmation.jsx, components/Fireworks.jsx]
+      backend_endpoints: [POST /reservations]
+
+  - id: UC-17
+    title: Rider views the confirmation page after booking
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-41]
+    preconditions:
+      - A reservation was just confirmed (or cancelled) in this browser session - state is passed via router navigation, not re-fetched by ID.
+    trigger: Successful POST /reservations navigates here automatically; also reachable after a cancel action.
+    main_flow:
+      - Shows the seat number, trip route, a status timeline (Booked -> En route -> Arrived, derived from departure_time), and the live vehicle tracker if the trip has a route configured.
+      - A one-shot fireworks animation plays for a freshly-confirmed (never a cancelled) reservation.
+    alternate_flows:
+      - Page reached with no reservation in navigation state (e.g. a hard refresh) -> Empty state directing back to search, not a crash.
+    postconditions:
+      - None from viewing; cancelling from here is UC-18.
+    related:
+      frontend: [pages/Confirmation.jsx, components/StatusTimeline.jsx, components/BusStopTracker.jsx]
+      backend_endpoints: []
+
+  - id: UC-18
+    title: Rider cancels a confirmed reservation
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-21]
+    preconditions:
+      - Reservation exists and is currently "confirmed".
+    trigger: Rider clicks "Cancel" from Confirmation or "My reservations".
+    main_flow:
+      - POST /reservations/{id}/cancel locks the reservation, flips status to "cancelled" with a cancelled_at timestamp, and frees the seat back to "available".    alternate_flows:
+      - Reservation doesn't belong to the caller -> 403 NOT_OWNER.
+      - Reservation is already cancelled -> idempotent no-op, returns the existing cancelled state unchanged (never double-applies cancelled_at).
+      - No confirmation dialog exists yet in the UI - clicking Cancel cancels immediately (known gap, tracked, not yet built).
+    postconditions:
+      - Seat is available again for other riders; reservation history retains the cancelled record.
+    related:
+      frontend: [pages/Confirmation.jsx, pages/MyReservations.jsx]
+      backend_endpoints: ["POST /reservations/{id}/cancel"]
+
+  - id: UC-19
+    title: Rider views their reservation history
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-22]
+    preconditions:
+      - Rider is authenticated.
+    trigger: Rider clicks "My reservations" in the nav, or from the dashboard.
+    main_flow:
+      - GET /reservations/me returns every reservation (confirmed and cancelled) for the caller, most recent first.
+      - Page header shows an upcoming/cancelled count; each row shows the route, seat, status badge, and (for confirmed trips) an embedded live vehicle tracker.
+    alternate_flows:
+      - No reservations yet -> Empty state with a "Search trips" call to action.
+    postconditions:
+      - None (read-only).
+    related:
+      frontend: [pages/MyReservations.jsx]
+      backend_endpoints: [GET /reservations/me]
+
+  # ─── LIVE VEHICLE TRACKING ───────────────────────────────────────────
+
+  - id: UC-20
+    title: Rider watches the live vehicle position update
+    category: full-stack
+    actors: [rider]
+    tickets: [SAHYOG-33, SAHYOG-34, SAHYOG-46]
+    preconditions:
+      - The trip's coordinator has configured a bus-stop route.
+    trigger: Rider views a trip/reservation/confirmation page with tracking configured; page polls every 5 seconds.
+    main_flow:
+      - BusStopTracker.jsx shows "Currently at - <stop name>" plus a stop-by-stop list (done/current/upcoming, icon-coded).
+      - If map coordinates are also set, an animated vehicle marker eases smoothly between the coordinator's real current_stop_sequence positions over ~1.4s per update - not a fake timer, driven entirely by real backend state.
+    alternate_flows:
+      - No route configured yet -> Empty state ("the coordinator hasn't set up live tracking for this trip yet").
+    postconditions:
+      - None (read-only, polling).
+    related:
+      frontend: [components/BusStopTracker.jsx, components/GeoMap.jsx]
+      backend_endpoints: ["GET /trips/{id}"]
+
+  - id: UC-21
+    title: Rider opens a zoomed, larger view of the live tracker
+    category: frontend
+    actors: [rider, coordinator]
+    tickets: [SAHYOG-47]
+    preconditions:
+      - The trip has map coordinates configured (GeoMap is rendering).
+    trigger: Rider clicks the expand icon on the inline map.
+    main_flow:
+      - A Modal (rendered via a React portal directly into document.body, so it always paints above the rest of the page regardless of any transformed content elsewhere) opens with a larger, scroll-to-zoom-enabled map and the same stop list.
+      - Escape key, the close button, or clicking the backdrop all close it.
+    postconditions:
+      - None; closing returns focus to the inline view.
+    related:
+      frontend: [components/Modal.jsx, components/BusStopTracker.jsx, components/GeoMap.jsx]
+      backend_endpoints: []
+
+  - id: UC-22
+    title: Coordinator defines a trip's bus-stop route
+    category: full-stack
+    actors: [coordinator]
+    tickets: [SAHYOG-46]
+    preconditions:
+      - Coordinator owns the trip.
+    trigger: Coordinator opens "Manage stops" for a published trip and enters stop names in order.
+    main_flow:
+      - PUT /trips/{id}/stops replaces the entire route in one call and resets current_stop_sequence to null (the old index may no longer be valid against the new list).
+      - No GPS or maps library involved in the stop list itself - plain ordered names.
+    alternate_flows:
+      - A rider (non-owner role) attempts this -> 403 FORBIDDEN_ROLE.
+      - A different coordinator (not the trip's owner) attempts this -> 403 NOT_OWNER.
+      - Empty stop_names list, or a name over 255 chars -> 422 VALIDATION_ERROR.
+    postconditions:
+      - Trip's bus_stops list is fully replaced; riders see the new route on their next poll.
+    related:
+      frontend: [pages/ManageStops.jsx]
+      backend_endpoints: ["PUT /trips/{id}/stops"]
+
+  - id: UC-23
+    title: Coordinator marks which stop the vehicle is currently at
+    category: full-stack
+    actors: [coordinator]
+    tickets: [SAHYOG-46]
+    preconditions:
+      - A route is already configured for the trip.
+    trigger: Coordinator taps a stop in the "Current vehicle position" list.
+    main_flow:
+      - PATCH /trips/{id}/stops/current sets current_stop_sequence; every rider's next 5-second poll picks up the change.    alternate_flows:
+      - No route configured yet -> 422 VALIDATION_ERROR ("This trip has no bus stops configured yet.").
+      - sequence references a stop that doesn't exist on this route -> 422 VALIDATION_ERROR ("That stop doesn't exist on this trip's route.").
+      - Non-owner coordinator or a rider attempts this -> 403 NOT_OWNER / FORBIDDEN_ROLE.
+    postconditions:
+      - Every viewer's tracker (inline and zoomed) reflects the new position within one poll cycle.
+    related:
+      frontend: [pages/ManageStops.jsx]
+      backend_endpoints: ["PATCH /trips/{id}/stops/current"]
+
+  - id: UC-24
+    title: Coordinator demos the tracker with auto-advancing stops
+    category: full-stack
+    actors: [coordinator]
+    tickets: [SAHYOG-46]
+    preconditions:
+      - A route is configured.
+    trigger: Coordinator toggles "Demo - keep moving" on the Manage Stops page.
+    main_flow:
+      - A client-side timer calls the *real* PATCH /trips/{id}/stops/current every 4 seconds, cycling forward through the route (wrapping back to the first stop after the last) - this automates a genuine coordinator action for live demos, it does not fabricate client-only animation.
+      - Any rider watching the tracker (on any device) sees the same real updates via their normal poll.
+    alternate_flows:
+      - Coordinator toggles it off at any time, stopping further auto-advances.
+    postconditions:
+      - Trip's current_stop_sequence keeps advancing until toggled off.
+    related:
+      frontend: [pages/ManageStops.jsx]
+      backend_endpoints: ["PATCH /trips/{id}/stops/current"]
+
+  # ─── TRIP MANAGEMENT (COORDINATOR) ───────────────────────────────────
+
+  - id: UC-25
+    title: Coordinator publishes a new trip
+    category: full-stack
+    actors: [coordinator]
+    tickets: [SAHYOG-05, SAHYOG-47]
+    preconditions:
+      - Coordinator is authenticated.
+    trigger: Coordinator fills in origin, destination, departure time, seat count (1-100, default 40), optional purpose, and submits.
+    main_flow:
+      - POST /trips creates the trip and auto-generates total_seats Seat rows numbered "1".."N", all "available".
+      - Optionally, origin/destination are geocoded client-side (OpenStreetMap Nominatim, no key) into lat/lng before submit, or the coordinator uses "Use my location"; the backend stores whatever four nullable floats it's given, without validating or geocoding them itself.
+      - After commit, a background task generates a pgvector embedding and an AI trip summary - never inside the creation transaction.
+      - A live preview card (with map, if coordinates are set) updates as the coordinator types.
+    alternate_flows:
+      - A rider attempts this -> 403 FORBIDDEN_ROLE.
+      - total_seats outside 1-100, or a missing required field -> 422 VALIDATION_ERROR.
+    postconditions:
+      - Trip and its seats exist and are immediately searchable by riders.
+    related:
+      frontend: [pages/CreateTrip.jsx, components/GeoMap.jsx]
+      backend_endpoints: [POST /trips]
+
+  - id: UC-26
+    title: Coordinator views their own published trips
+    category: full-stack
+    actors: [coordinator]
+    tickets: [SAHYOG-42]
+    preconditions:
+      - Coordinator is authenticated.
+    trigger: Coordinator clicks "My trips".
+    main_flow:
+      - GET /trips/mine returns every trip the caller published, most recently departing first, with live seats_available and AI-derived summary/high-demand flags.
+      - Page header shows aggregate stats (trips published, total seats filled across all trips, count of AI-flagged high-demand trips).
+      - Each card links to "View passengers" (UC-27) and "Stops" (UC-22/23).
+    alternate_flows:
+      - A rider attempts to reach this page/endpoint -> 403 FORBIDDEN_ROLE.
+      - No trips published yet -> Empty state with a "Create a trip" call to action.
+    postconditions:
+      - None (read-only).
+    related:
+      frontend: [pages/MyTrips.jsx]
+      backend_endpoints: [GET /trips/mine]
+
+  - id: UC-27
+    title: Coordinator reviews the confirmed passenger list for a trip
+    category: full-stack
+    actors: [coordinator]
+    tickets: [SAHYOG-20, SAHYOG-30, SAHYOG-32, SAHYOG-40, SAHYOG-43]
+    preconditions:
+      - Coordinator owns the trip.
+    trigger: Coordinator clicks "View passengers" from My trips.
+    main_flow:
+      - GET /trips/{id}/passengers returns every confirmed reservation (seat order), each with the passenger's captured name/phone, an AI urgency label (high/medium/low, from background triage), and an AI accessibility tag (from the rider's optional note) when available.
+      - A synchronous, read-only "digest" one-liner summarises the passenger mix (e.g. "3 of 4 seats confirmed, including 1 high-urgency rider").
+      - Page header shows a quick triage strip (counts of high-urgency and needs-assistance passengers) when any are present.
+    alternate_flows:
+      - A different coordinator (not the owner) or a rider attempts this -> 403 NOT_OWNER / FORBIDDEN_ROLE.
+      - No confirmed passengers yet -> Empty state.
+      - AI is off/unconfigured -> ai_urgency_label, ai_accessibility_tags, and digest are all null; the list of names/seats/phones still renders correctly (never breaks the page).
+    postconditions:
+      - None (read-only).
+    related:
+      frontend: [pages/PassengerList.jsx]
+      backend_endpoints: ["GET /trips/{id}/passengers"]
+
+  - id: UC-28
+    title: A trip gets auto-flagged as high demand
+    category: backend
+    actors: [coordinator]
+    tickets: [SAHYOG-42]
+    preconditions:
+      - A reservation was just confirmed on the trip.
+    trigger: The same post-commit background task from UC-16 (run_reservation_triage) also re-evaluates the trip's overall demand.
+    main_flow:
+      - If demand is unusually high relative to capacity, ai_high_demand is set true on the trip.
+      - Riders see a "High demand" badge on search results and My trips cards; coordinators see it on My trips.
+    alternate_flows:
+      - AI unavailable -> ai_high_demand stays null; no badge shown, no error.
+    postconditions:
+      - Purely additive display data; never affects seat availability logic.
+    related:
+      frontend: [pages/SearchTrips.jsx, pages/MyTrips.jsx]
+      backend_endpoints: [GET /trips, GET /trips/mine]
+
+  # ─── AI ASSISTANT / HELP ─────────────────────────────────────────────
+
+  - id: UC-29
+    title: User asks the in-app help assistant a question
+    category: full-stack
+    actors: [rider, coordinator]
+    tickets: [SAHYOG-45]
+    preconditions:
+      - User is authenticated (rider or coordinator).
+    trigger: User opens the floating chat widget and types a question (e.g. "how do I cancel my booking?").
+    main_flow:
+      - POST /ai/assistant answers using a fixed FAQ as grounding context - it has zero database access, so there is nothing account/trip/reservation-specific for it to leak even under prompt injection, and it can never book/cancel/modify anything.    alternate_flows:
+      - AI off/unconfigured/timeout -> deterministic keyword match over the same FAQ topics (holding a seat, hold expiry, confirming, cancelling, tracking the vehicle, payment/refunds, accessibility notes, creating a trip, missing the vehicle, finding a past booking), fallback=true, still HTTP 200.
+      - Question matches no FAQ topic -> a generic default answer pointing to My reservations/My trips, never an error.
+    postconditions:
+      - None (read-only, no side effects of any kind).
+    related:
+      frontend: [components/HelpAssistant.jsx]
+      backend_endpoints: [POST /ai/assistant]
+
+  - id: UC-30
+    title: The entire app functions correctly with AI switched off
+    category: backend
+    actors: [rider, coordinator]
+    tickets: []
+    preconditions:
+      - AI_ENABLED=false (or AI_API_KEY unset).
+    trigger: Any AI-touching use case above (UC-07, UC-10, UC-11, UC-16's triage, UC-27's digest, UC-28, UC-29) is exercised.
+    main_flow:
+      - Every AI call short-circuits before hitting a network request and returns None to its caller.
+      - Every caller has an already-defined deterministic fallback (keyword search, nearest-available seat, same-destination lookup, null badges, FAQ keyword match) and returns normal HTTP 200/201 responses - never a 5xx, never a broken page.
+    postconditions:
+      - Full register -> search -> hold -> confirm -> cancel flow (and every coordinator flow) works identically to AI being on, minus the AI-only polish (summaries, smart suggestions, chat answers).
+    related:
+      frontend: [entire app]
+      backend_endpoints: [POST /ai/search, GET /ai/search, POST /ai/assistant, "POST /trips/{id}/seat-recommendation", "GET /trips/{id}/similar (no live call regardless)", any endpoint touching ai_summary/ai_high_demand/ai_urgency_label/ai_accessibility_tags]
+
+  # ─── DASHBOARD & NAVIGATION ──────────────────────────────────────────
+
+  - id: UC-31
+    title: Rider views their personalized dashboard
+    category: full-stack
+    actors: [rider]
+    tickets: []
+    preconditions:
+      - Rider is authenticated.
+    trigger: Rider navigates to "/" while logged in.
+    main_flow:
+      - Fetches the rider's own reservations to show a "Your next ride" banner (nearest upcoming confirmed trip) and stat tiles (upcoming/cancelled counts).
+      - Quick-link cards to Search trips and My reservations.
+    alternate_flows:
+      - No reservations yet -> banner/stats simply don't render; quick-link cards still do.
+    postconditions:
+      - None (read-only).
+    related:
+      frontend: [pages/Dashboard.jsx]
+      backend_endpoints: [GET /reservations/me]
+
+  - id: UC-32
+    title: Coordinator views their personalized dashboard
+    category: full-stack
+    actors: [coordinator]
+    tickets: []
+    preconditions:
+      - Coordinator is authenticated.
+    trigger: Coordinator navigates to "/" while logged in.
+    main_flow:
+      - Fetches the coordinator's own trips to show stat tiles (trips published, seats filled out of total, high-demand trip count).
+      - Quick-link cards to Search trips, Create a trip, and My trips.
+    alternate_flows:
+      - No trips published yet -> stats don't render; quick-link cards still do.
+    postconditions:
+      - None (read-only).
+    related:
+      frontend: [pages/Dashboard.jsx]
+      backend_endpoints: [GET /trips/mine]
+
+  # ─── CROSS-CUTTING ERROR / EDGE-CASE HANDLING ────────────────────────
+
+  - id: UC-33
+    title: Any request without a valid JWT is rejected
+    category: backend
+    actors: [guest]
+    tickets: [SAHYOG-04]
+    preconditions:
+      - Request has no Authorization header, or an invalid/expired one.
+    trigger: Any call to a protected endpoint.
+    main_flow:
+      - app/deps.py's get_current_user dependency raises 401 UNAUTHENTICATED before any route logic runs.
+    postconditions:
+      - No data read or written.
+    related:
+      frontend: [App.jsx route guards pre-empt most of these in the UI]
+      backend_endpoints: [every endpoint except POST /auth/register, POST /auth/login]
+
+  - id: UC-34
+    title: User attempts an action outside their role or ownership
+    category: backend
+    actors: [rider, coordinator]
+    tickets: [SAHYOG-05, SAHYOG-15, SAHYOG-17, SAHYOG-18, SAHYOG-20, SAHYOG-46]
+    preconditions:
+      - Caller is authenticated but is either the wrong role for the endpoint, or not the owner of the specific resource.
+    trigger: E.g. a rider calling POST /trips, or a coordinator viewing another coordinator's passenger list, or a rider releasing someone else's hold.
+    main_flow:
+      - Role checks -> 403 FORBIDDEN_ROLE. Ownership checks (hold/reservation/trip belongs to someone else) -> 403 NOT_OWNER.
+    postconditions:
+      - No data read or written beyond what the error itself reveals (nothing sensitive).
+    related:
+      frontend: [ErrorState.jsx renders these consistently]
+      backend_endpoints: [POST /trips, GET /trips/mine, "DELETE /holds/{id}", POST /reservations, "POST /reservations/{id}/cancel", "GET /trips/{id}/passengers", "PUT /trips/{id}/stops", "PATCH /trips/{id}/stops/current", "POST /trips/{id}/seat-recommendation"]
+
+  - id: UC-35
+    title: User references a resource that doesn't exist
+    category: backend
+    actors: [rider, coordinator]
+    tickets: []
+    preconditions:
+      - Path ID (trip/hold/reservation/seat) doesn't exist in the database.
+    trigger: E.g. a stale bookmark to a deleted/never-existing trip ID.
+    main_flow:
+      - The relevant service raises 404 NOT_FOUND before any mutation.
+    postconditions:
+      - No data read or written.
+    related:
+      frontend: [ErrorState.jsx with retry]
+      backend_endpoints: ["GET /trips/{id}", "GET /trips/{id}/passengers", "POST /trips/{id}/seat-recommendation", "GET /trips/{id}/similar", "PUT /trips/{id}/stops", "PATCH /trips/{id}/stops/current", POST /holds, "DELETE /holds/{id}", POST /reservations, "POST /reservations/{id}/cancel"]
+
+  - id: UC-36
+    title: A request fails schema validation
+    category: full-stack
+    actors: [guest, rider, coordinator]
+    tickets: []
+    preconditions:
+      - Request body/query params don't satisfy the Pydantic schema (missing required field, out-of-range value, wrong type).
+    trigger: E.g. registering with a 6-character password, creating a trip with total_seats=0, or confirming a reservation with a 3-digit phone number.
+    main_flow:
+      - FastAPI's validation layer raises 422 VALIDATION_ERROR with the specific offending field name in the error envelope.
+      - Frontend forms surface this inline next to the relevant field where practical, or as a general ErrorState otherwise.
+    postconditions:
+      - No data written.
+    related:
+      frontend: [every form: Register.jsx, Login.jsx, CreateTrip.jsx, TripDetail.jsx (confirm form), ManageStops.jsx]
+      backend_endpoints: [every POST/PUT/PATCH endpoint]
