@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { XMarkIcon } from "@heroicons/react/24/outline";
 
@@ -6,6 +7,17 @@ import { XMarkIcon } from "@heroicons/react/24/outline";
 // so this doesn't touch the AnimatePresence-across-navigation issue that
 // Layout.jsx deliberately avoids (see the comment there). Safe to use
 // AnimatePresence here since nothing inside depends on route params.
+//
+// Rendered via a portal straight into document.body (not inline where
+// this component is called) - a modal nested deep in the page (e.g.
+// inside a sticky sidebar card, as with BusStopTracker's zoomed map)
+// could otherwise end up visually beneath unrelated later-painted
+// siblings elsewhere on the page (e.g. Leaflet's own control panes, or
+// any transformed element like Magnetic-wrapped seat buttons), since
+// its z-index is only ever compared against whatever ends up sharing
+// its stacking context. A portal sidesteps that entirely: the modal's
+// DOM node becomes a direct, final child of <body>, so `z-50` always
+// wins against the rest of the page.
 export default function Modal({ open, onClose, title, children }) {
   const reduceMotion = useReducedMotion();
 
@@ -18,7 +30,7 @@ export default function Modal({ open, onClose, title, children }) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [open, onClose]);
 
-  return (
+  return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
@@ -54,6 +66,7 @@ export default function Modal({ open, onClose, title, children }) {
           </motion.div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
