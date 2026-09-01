@@ -146,3 +146,40 @@ def test_assistant_never_5xx_even_for_odd_input():
     )
     assert res.status_code == 200
     assert res.json()["fallback"] is True
+
+
+# ── Regression: "how do I book a ride" fell through to the generic
+# default, since the only existing keyword was the narrower "book a
+# seat" phrase under "holding a seat" - a plain "book a/the ride"
+# question shares no substring with any topic's keywords.
+
+
+def test_assistant_answers_how_to_book_a_ride_with_full_overview():
+    rider = register("rider")
+    for question in [
+        "how to book the ride",
+        "how do I book a ride",
+        "how do I book my ride",
+        "make a booking",
+    ]:
+        res = client.post("/ai/assistant", json={"question": question}, headers=auth_header(rider["token"]))
+        assert res.status_code == 200
+        body = res.json()
+        assert body["fallback"] is True
+        answer = body["answer"].lower()
+        # The overview should mention the whole flow, not just one step.
+        assert "search" in answer
+        assert "hold" in answer
+        assert "confirm" in answer
+
+
+def test_assistant_book_a_seat_still_routes_to_the_more_specific_hold_answer():
+    """'book a seat' already matches the narrower 'holding a seat' topic -
+    the new generic overview must not steal that, more specific match."""
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant", json={"question": "how do I book a seat?"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    answer = res.json()["answer"].lower()
+    assert "seat map" in answer

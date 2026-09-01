@@ -15,6 +15,19 @@ from app.services import ai_service
 # with AI disabled" guarantee as ai_search's keyword fallback.
 FAQ = [
     {
+        "topic": "how to book a ride (overview)",
+        "keywords": [
+            "book a ride", "book the ride", "book my ride", "booking a ride",
+            "make a booking", "reserve a ride", "get a ride", "find a ride",
+        ],
+        "answer": (
+            "Search for a trip on the 'Search trips' page, then tap any available seat "
+            "to hold it. Fill in your name and phone number and tap 'Confirm reservation' "
+            f"- that's it, your seat is booked. A hold only lasts {{hold_ttl}} minutes, so "
+            "confirm before it expires."
+        ),
+    },
+    {
         "topic": "holding a seat",
         "keywords": ["hold", "reserve seat", "pick a seat", "select seat", "book a seat"],
         "answer": (

@@ -26,6 +26,88 @@ def _describe_position(seat_number: str) -> dict:
     return {"seat_number": seat_number, "row": row, "side": side, "edge": edge}
 
 
+# Deterministic, keyword-driven fallback used whenever the real AI is
+# unavailable (off, unconfigured, timed out, or hallucinated an
+# unavailable seat) - this is the path that actually runs in this
+# project's environment (no AI_API_KEY configured), so it needs to be
+# genuinely useful on its own, not just "pick seat 1". Checked in order;
+# first match wins. Each entry: (keywords, preferred edge, prefer front rows, reason).
+_PREFERENCE_RULES: list[tuple[list[str], str | None, bool, str]] = [
+    (
+        ["wheelchair", "walker", "crutch", "mobility"],
+        "aisle",
+        True,
+        "An aisle seat near the front, for easier wheelchair/mobility access and boarding.",
+    ),
+    (
+        ["pregnant", "pregnancy"],
+        "aisle",
+        True,
+        "An aisle seat near the front, for easier and quicker access on and off.",
+    ),
+    (
+        ["elderly", "senior citizen", "senior", "old age", "grandmother", "grandfather", "grandma", "grandpa"],
+        "aisle",
+        True,
+        "An aisle seat near the front, so there's less distance and no climbing over anyone.",
+    ),
+    (
+        ["motion sickness", "car sick", "carsick", "nausea", "nauseous", "travel sickness"],
+        None,
+        True,
+        "A front-row seat, where the ride is smoothest and motion is felt least.",
+    ),
+    (
+        ["toddler", "child", "kid", "infant", "baby"],
+        "window",
+        False,
+        "A window seat, to keep a child settled and safely away from the aisle.",
+    ),
+    (
+        ["aisle seat", "aisle", "leg room", "legroom", "stretch my legs"],
+        "aisle",
+        False,
+        "An aisle seat, as requested, with easy access to get up.",
+    ),
+    (
+        ["window seat", "by the window", "near the window", "window"],
+        "window",
+        False,
+        "A window seat, as requested.",
+    ),
+]
+
+
+def _infer_preference(note: str) -> tuple[str | None, bool, str | None]:
+    """Returns (preferred_edge, prefer_front_rows, reason) for the first
+    matching rule, or (None, False, None) if the note matches nothing
+    specific - callers fall back to nearest-available in that case.
+    """
+    lowered = note.lower()
+    for keywords, edge, prefer_front, reason in _PREFERENCE_RULES:
+        if any(keyword in lowered for keyword in keywords):
+            return edge, prefer_front, reason
+    return None, False, None
+
+
+def _fallback_pick(available: list, note: str) -> tuple[str, str]:
+    """Picks the best available seat for the note's inferred preference
+    (edge + front-of-bus), falling back to the plain nearest-available
+    seat when nothing in the note matches a known need."""
+    edge, prefer_front, reason = _infer_preference(note)
+
+    def sort_key(seat):
+        pos = _describe_position(seat.seat_number)
+        edge_penalty = 0 if edge is None or pos["edge"] == edge else 1
+        row = pos["row"] if (edge is not None or prefer_front) else 0
+        return (edge_penalty, row, int(seat.seat_number))
+
+    best = min(available, key=sort_key)
+    if reason is None:
+        reason = "Nearest available seat (AI suggestion unavailable)."
+    return best.seat_number, reason
+
+
 def recommend_seat(db: Session, trip_id: int, note: str) -> SeatRecommendationResponse:
     trip = db.get(Trip, trip_id)
     if trip is None:
@@ -44,11 +126,10 @@ def recommend_seat(db: Session, trip_id: int, note: str) -> SeatRecommendationRe
 
     # AI off, timed out, or picked a seat_number that isn't actually
     # available right now (race condition or hallucination) - treated
-    # identically, never retried or remapped. Deterministic fallback so
-    # the endpoint always returns a usable seat when one exists.
-    fallback_seat = min(available, key=lambda s: int(s.seat_number))
-    return SeatRecommendationResponse(
-        seat_number=fallback_seat.seat_number,
-        reason="Nearest available seat (AI suggestion unavailable).",
-        fallback=True,
-    )
+    # identically, never retried or remapped. The fallback still reads
+    # the rider's note for known needs (wheelchair, window, motion
+    # sickness, travelling with a child, ...) instead of blindly
+    # returning the lowest-numbered seat, so the endpoint stays useful
+    # even with AI completely unavailable.
+    seat_number, reason = _fallback_pick(available, note)
+    return SeatRecommendationResponse(seat_number=seat_number, reason=reason, fallback=True)

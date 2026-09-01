@@ -192,3 +192,180 @@ def test_recommendation_rejects_empty_note():
 def test_recommendation_requires_auth():
     res = client.post("/trips/1/seat-recommendation", json={"note": "anything"})
     assert res.status_code == 401
+
+
+# ── Fallback effectiveness (SAHYOG-38 follow-up) ──────────────────────
+# The fallback below runs whenever the real AI is unavailable - which is
+# always, in an environment with no AI_API_KEY configured. These tests
+# monkeypatch ai_service.recommend_seat to None explicitly (rather than
+# relying on the environment having no key) so they stay meaningful even
+# if a real key is ever configured for this test run. All use a 20-seat
+# trip (5 rows of 4) so front/back and window/aisle differences actually
+# exist to pick between.
+
+
+def _seat_position(seat_number: str) -> dict:
+    idx = int(seat_number) - 1
+    row = idx // 4 + 1
+    col = idx % 4
+    edge = "window" if col in (0, 3) else "aisle"
+    return {"row": row, "edge": edge}
+
+
+def test_recommendation_fallback_wheelchair_prefers_aisle_seat_near_front(monkeypatch):
+    monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], total_seats=20)
+
+    res = client.post(
+        f"/trips/{trip['id']}/seat-recommendation",
+        json={"note": "I use a wheelchair"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["fallback"] is True
+    pos = _seat_position(body["seat_number"])
+    assert pos["edge"] == "aisle"
+    assert pos["row"] == 1
+    assert "aisle" in body["reason"].lower()
+
+
+def test_recommendation_fallback_elderly_companion_prefers_aisle_seat_near_front(monkeypatch):
+    monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], total_seats=20)
+
+    res = client.post(
+        f"/trips/{trip['id']}/seat-recommendation",
+        json={"note": "travelling with my elderly grandmother"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    pos = _seat_position(body["seat_number"])
+    assert pos["edge"] == "aisle"
+    assert pos["row"] == 1
+
+
+def test_recommendation_fallback_window_request_prefers_window_seat(monkeypatch):
+    monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], total_seats=20)
+
+    res = client.post(
+        f"/trips/{trip['id']}/seat-recommendation",
+        json={"note": "I'd like a window seat please"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    pos = _seat_position(body["seat_number"])
+    assert pos["edge"] == "window"
+    assert "window" in body["reason"].lower()
+
+
+def test_recommendation_fallback_child_prefers_window_seat(monkeypatch):
+    monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], total_seats=20)
+
+    res = client.post(
+        f"/trips/{trip['id']}/seat-recommendation",
+        json={"note": "travelling with a toddler"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    pos = _seat_position(body["seat_number"])
+    assert pos["edge"] == "window"
+
+
+def test_recommendation_fallback_motion_sickness_prefers_front_row(monkeypatch):
+    monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], total_seats=20)
+
+    res = client.post(
+        f"/trips/{trip['id']}/seat-recommendation",
+        json={"note": "I get really bad motion sickness"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    pos = _seat_position(body["seat_number"])
+    assert pos["row"] == 1
+    assert "front" in body["reason"].lower()
+
+
+def test_recommendation_fallback_aisle_request_prefers_aisle_seat(monkeypatch):
+    monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], total_seats=20)
+
+    res = client.post(
+        f"/trips/{trip['id']}/seat-recommendation",
+        json={"note": "I need extra leg room, an aisle seat"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    pos = _seat_position(body["seat_number"])
+    assert pos["edge"] == "aisle"
+
+
+def test_recommendation_fallback_prefers_available_aisle_seat_over_taken_one(monkeypatch):
+    """The front-row aisle seats are already taken - the wheelchair
+    preference must still land on an actually-available aisle seat, not
+    just report failure or silently ignore the preference."""
+    monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], total_seats=20)
+
+    # Reserve both row-1 aisle seats (seat numbers "2" and "3") so the
+    # heuristic has to look further back.
+    db = SessionLocal()
+    try:
+        for seat in db.query(Seat).filter(Seat.trip_id == trip["id"], Seat.seat_number.in_(["2", "3"])).all():
+            seat.status = SeatStatus.RESERVED
+        db.commit()
+    finally:
+        db.close()
+
+    res = client.post(
+        f"/trips/{trip['id']}/seat-recommendation",
+        json={"note": "I use a wheelchair"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    pos = _seat_position(body["seat_number"])
+    assert pos["edge"] == "aisle"
+    assert pos["row"] == 2  # nearest still-available aisle row
+    assert body["seat_number"] in {"6", "7"}
+
+
+def test_recommendation_fallback_no_keyword_match_still_picks_nearest_seat(monkeypatch):
+    """No recognised need in the note - falls back to plain nearest-
+    available, same guarantee as before this heuristic existed."""
+    monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], total_seats=20)
+
+    res = client.post(
+        f"/trips/{trip['id']}/seat-recommendation",
+        json={"note": "no particular preference, anything works"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["seat_number"] == "1"
+    assert "nearest available" in body["reason"].lower()

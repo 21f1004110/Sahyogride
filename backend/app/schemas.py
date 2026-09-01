@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -249,13 +249,32 @@ class AISearchTripItem(BaseModel):
     origin: str
     destination: str
     departure_time: datetime
+    purpose: str | None = None
+    seats_available: int | None = None
+    total_seats: int | None = None
+    match_score: float | None = None
+    match_reason: str | None = None
 
     model_config = {"from_attributes": True}
+
+
+class ParsedQuery(BaseModel):
+    """What the search understood from the rider's free-text query
+    (SAHYOG-26 follow-up) - plain keyword/date parsing, not a model
+    call, so it's populated identically whether the request took the
+    real semantic path or the keyword fallback."""
+
+    travel_date: date | None = None
+    date_label: str | None = None
+    time_of_day: str | None = None
+    purpose: str | None = None
+    location_hint: str | None = None
 
 
 class AISearchResponse(BaseModel):
     trips: list[AISearchTripItem]
     fallback: bool
+    parsed: ParsedQuery | None = None
 
 
 class SeatRecommendationRequest(BaseModel):
