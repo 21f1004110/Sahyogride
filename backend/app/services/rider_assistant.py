@@ -1,13 +1,22 @@
-# Orchestrates the help assistant (SAHYOG-45): synchronous, read-only,
-# no DB access at all - it only ever sees the rider's question and a
-# fixed static FAQ, never any trip/reservation/account data, so there is
-# nothing for it to leak even under prompt injection. Never inside
-# hold_seat()/confirm_reservation()'s locked transaction, never calls
-# either - CLAUDE.md rule #3, zero write power.
+# Orchestrates the help assistant (SAHYOG-45): synchronous, read-only.
+# Answers about app mechanics (FAQ topics below) never touch the
+# database - only the rider's question and a fixed static FAQ, never any
+# trip/reservation/account data, so there is nothing for those to leak
+# even under prompt injection. When a question instead looks like a
+# trip request ("how can I go to the hospital"), it's handed to the
+# same read-only, public trip search /ai/search already uses - real
+# clickable trip suggestions, never anything account-specific. Never
+# inside hold_seat()/confirm_reservation()'s locked transaction, never
+# calls either, never writes anything - CLAUDE.md rule #3, zero write
+# power either way.
+
+from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.schemas import AssistantAnswerResponse
 from app.services import ai_service
+from app.services.ai_search import ai_search
+from app.services.query_understanding import parse_query
 
 # Grounds the AI's answer (see ai_service.answer_rider_question's system
 # prompt) and doubles as the deterministic fallback when AI is off,
@@ -137,6 +146,11 @@ def _render(answer: str) -> str:
     return answer.format(hold_ttl=settings.hold_ttl_minutes)
 
 
+def _matches_faq_topic(question: str) -> bool:
+    lowered = question.lower()
+    return any(any(keyword in lowered for keyword in entry["keywords"]) for entry in FAQ)
+
+
 def _keyword_fallback(question: str) -> str:
     lowered = question.lower()
     for entry in FAQ:
@@ -149,7 +163,43 @@ def _faq_context() -> str:
     return "\n".join(f"- {entry['topic']}: {_render(entry['answer'])}" for entry in FAQ)
 
 
-def answer_question(question: str) -> AssistantAnswerResponse:
+def _looks_like_a_trip_request(question: str) -> bool:
+    """True when the rider seems to be describing where they need to go
+    ("how can I go to the hospital") rather than asking how a feature
+    works. Reuses the same deterministic parsing ai_search.py already
+    does - no model call - so this works identically with AI on or off.
+    """
+    parsed = parse_query(question)
+    return bool(parsed["purpose"] or parsed["location_hint"])
+
+
+MAX_SUGGESTED_TRIPS = 3
+
+
+def _search_and_suggest(db: Session, question: str) -> AssistantAnswerResponse:
+    search_result = ai_search(db, question)
+    matches = search_result.trips[:MAX_SUGGESTED_TRIPS]
+
+    if matches:
+        count = "a trip" if len(matches) == 1 else f"{len(matches)} trips"
+        answer = f"I found {count} that might work - tap one below to see seats and book."
+        return AssistantAnswerResponse(answer=answer, fallback=True, suggested_trips=matches)
+
+    return AssistantAnswerResponse(
+        answer="I couldn't find a matching trip right now - try searching directly, or adjust the date.",
+        fallback=True,
+        suggested_query=question,
+    )
+
+
+def answer_question(db: Session, question: str) -> AssistantAnswerResponse:
+    # A question explicitly about how a feature works (holding, cancelling,
+    # tracking, ...) always gets that answer, even if it also happens to
+    # mention a place - "how do I cancel my hospital trip" is about
+    # cancelling, not a new search.
+    if not _matches_faq_topic(question) and _looks_like_a_trip_request(question):
+        return _search_and_suggest(db, question)
+
     result = ai_service.answer_rider_question(question, _faq_context())
     if result is not None:
         return AssistantAnswerResponse(answer=result.answer, fallback=False)

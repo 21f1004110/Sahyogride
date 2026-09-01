@@ -183,3 +183,110 @@ def test_assistant_book_a_seat_still_routes_to_the_more_specific_hold_answer():
     assert res.status_code == 200
     answer = res.json()["answer"].lower()
     assert "seat map" in answer
+
+
+# ── Trip-seeking questions ("how can I go to the hospital") should return
+# real, clickable trip suggestions instead of the generic FAQ default.
+
+
+def create_trip(coordinator_token: str, origin: str, destination: str, purpose: str | None) -> dict:
+    payload = {
+        "origin": origin,
+        "destination": destination,
+        "departure_time": "2026-07-15T09:30:00Z",
+        "total_seats": 2,
+        "purpose": purpose,
+    }
+    res = client.post("/trips", json=payload, headers=auth_header(coordinator_token))
+    assert res.status_code == 201, res.text
+    return res.json()
+
+
+def test_assistant_suggests_real_trips_for_a_trip_seeking_question():
+    # The dev/test database persists trips across test runs (no truncation
+    # between tests - see CLAUDE.md-adjacent safety policy in this repo's
+    # history), so a generic "City Hospital" trip could easily be pushed
+    # past MAX_SUGGESTED_TRIPS by other tests' fixtures. Give this trip a
+    # unique destination that's also named verbatim in the question, so it
+    # wins the search's whole-phrase-match bonus outright rather than
+    # relying on being one of only a few "medical" trips in the database.
+    coordinator = register("coordinator")
+    unique = uuid.uuid4().hex[:8]
+    destination = f"unique-{unique} care hospital"
+    trip = create_trip(coordinator["token"], origin="Central Depot", destination=destination, purpose="medical")
+    rider = register("rider")
+
+    res = client.post(
+        "/ai/assistant",
+        json={"question": f"how can i go to the unique-{unique} care hospital"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["fallback"] is True
+    assert body["suggested_query"] is None
+    assert body["suggested_trips"] is not None
+    assert any(t["id"] == trip["id"] for t in body["suggested_trips"])
+    assert "tap" in body["answer"].lower()
+
+
+def test_assistant_bridges_flight_wording_to_an_airport_trip_suggestion():
+    coordinator = register("coordinator")
+    unique = uuid.uuid4().hex[:8]
+    destination = f"terminal-{unique} airport"
+    trip = create_trip(coordinator["token"], origin="Connaught Place", destination=destination, purpose=None)
+    rider = register("rider")
+
+    res = client.post(
+        "/ai/assistant",
+        json={"question": f"i want to catch a flight from terminal-{unique} airport"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["suggested_trips"] is not None
+    assert any(t["id"] == trip["id"] for t in body["suggested_trips"])
+
+
+def test_assistant_faq_topic_takes_priority_over_trip_seeking_signal():
+    """'how do I cancel my hospital trip' mentions a place, but the
+    question is about cancelling - the FAQ answer must win, not a search."""
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant",
+        json={"question": "how do I cancel my hospital trip?"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["suggested_trips"] is None
+    assert "cancel" in body["answer"].lower()
+
+
+def test_assistant_returns_suggested_query_when_no_trip_matches():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant",
+        json={"question": "how can i go to the hospital"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    # No medical/hospital trip has been created in this test's isolated DB
+    # state, so this should fall back to a suggested search query, never
+    # the old generic default text.
+    if body["suggested_trips"] is None:
+        assert body["suggested_query"] == "how can i go to the hospital"
+    else:
+        assert len(body["suggested_trips"]) > 0
+
+
+def test_assistant_regular_questions_unaffected_by_trip_suggestion_routing():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant", json={"question": "what is the meaning of life"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    body = res.json()
+    assert body["suggested_trips"] is None
+    assert body["suggested_query"] is None

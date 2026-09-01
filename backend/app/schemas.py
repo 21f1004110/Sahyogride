@@ -299,3 +299,5 @@ class AssistantQuestionRequest(BaseModel):
 class AssistantAnswerResponse(BaseModel):
     answer: str
     fallback: bool
+    suggested_trips: list[AISearchTripItem] | None = None
+    suggested_query: str | None = None

@@ -1,10 +1,15 @@
 import { useState } from "react";
+import { Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
   ChatBubbleLeftRightIcon,
+  ClockIcon,
+  MagnifyingGlassIcon,
   PaperAirplaneIcon,
   SparklesIcon,
+  TagIcon,
+  UsersIcon,
   XMarkIcon,
 } from "@heroicons/react/24/outline";
 
@@ -25,7 +30,17 @@ export default function HelpAssistant() {
   const askMutation = useMutation({
     mutationFn: (q) => askAssistant(q),
     onSuccess: (data, q) => {
-      setThread((prev) => [...prev, { role: "user", text: q }, { role: "assistant", text: data.answer, fallback: data.fallback }]);
+      setThread((prev) => [
+        ...prev,
+        { role: "user", text: q },
+        {
+          role: "assistant",
+          text: data.answer,
+          fallback: data.fallback,
+          suggestedTrips: data.suggested_trips,
+          suggestedQuery: data.suggested_query,
+        },
+      ]);
     },
     onError: (_err, q) => {
       setThread((prev) => [
@@ -99,19 +114,65 @@ export default function HelpAssistant() {
               )}
 
               {thread.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`text-sm rounded-xl px-3 py-2 max-w-[85%] ${
-                    msg.role === "user"
-                      ? "bg-primary-600 text-white ml-auto"
-                      : "bg-gray-100 text-gray-800 mr-auto"
-                  }`}
-                >
-                  {msg.text}
-                  {msg.role === "assistant" && (
-                    <p className={`text-xs mt-1 ${msg.fallback ? "text-gray-400" : "text-primary-500"}`}>
-                      {msg.fallback ? "Answered from FAQ" : "Answered by AI"}
-                    </p>
+                <div key={i} className={msg.role === "user" ? "ml-auto max-w-[85%]" : "mr-auto max-w-[92%]"}>
+                  <div
+                    className={`text-sm rounded-xl px-3 py-2 ${
+                      msg.role === "user" ? "bg-primary-600 text-white" : "bg-gray-100 text-gray-800"
+                    }`}
+                  >
+                    {msg.text}
+                    {msg.role === "assistant" && !msg.suggestedTrips?.length && (
+                      <p className={`text-xs mt-1 ${msg.fallback ? "text-gray-400" : "text-primary-500"}`}>
+                        {msg.fallback ? "Answered from FAQ" : "Answered by AI"}
+                      </p>
+                    )}
+                  </div>
+
+                  {msg.role === "assistant" && msg.suggestedTrips?.length > 0 && (
+                    <ul className="mt-1.5 space-y-1.5">
+                      {msg.suggestedTrips.map((trip) => (
+                        <li key={trip.id}>
+                          <Link
+                            to={`/trips/${trip.id}`}
+                            onClick={() => setOpen(false)}
+                            className="block rounded-lg border border-gray-200 bg-white px-3 py-2 hover:border-primary-300 hover:bg-primary-50/40 transition"
+                          >
+                            <p className="text-sm font-medium text-gray-900 truncate">
+                              {trip.origin} &rarr; {trip.destination}
+                            </p>
+                            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 text-xs text-gray-500 mt-1">
+                              <span className="flex items-center gap-1">
+                                <ClockIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                {new Date(trip.departure_time).toLocaleString()}
+                              </span>
+                              {trip.purpose && (
+                                <span className="flex items-center gap-1">
+                                  <TagIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  {trip.purpose}
+                                </span>
+                              )}
+                              {trip.seats_available != null && (
+                                <span className="flex items-center gap-1">
+                                  <UsersIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                                  {trip.seats_available}/{trip.total_seats} seats
+                                </span>
+                              )}
+                            </div>
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {msg.role === "assistant" && msg.suggestedQuery && (
+                    <Link
+                      to={`/trips?q=${encodeURIComponent(msg.suggestedQuery)}`}
+                      onClick={() => setOpen(false)}
+                      className="mt-1.5 flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-700"
+                    >
+                      <MagnifyingGlassIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
+                      Search trips for "{msg.suggestedQuery}"
+                    </Link>
                   )}
                 </div>
               ))}

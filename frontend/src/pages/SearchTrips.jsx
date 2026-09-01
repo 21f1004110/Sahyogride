@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion, useReducedMotion } from "framer-motion";
 import {
   CalendarDaysIcon,
@@ -44,6 +44,8 @@ function SeatAvailabilityBar({ available, total }) {
 
 export default function SearchTrips() {
   const reduceMotion = useReducedMotion();
+  const [searchParams] = useSearchParams();
+  const initialQuery = searchParams.get("q") ?? "";
   const [filters, setFilters] = useState({ origin: "", destination: "", date: "", q: "" });
   const [appliedFilters, setAppliedFilters] = useState(filters);
 
@@ -92,7 +94,7 @@ export default function SearchTrips() {
         transition={{ duration: 0.4, delay: 0.05, ease: "easeOut" }}
         className="mb-8"
       >
-        <AssistantBox />
+        <AssistantBox initialQuery={initialQuery} />
       </motion.div>
 
       <div className="grid gap-8 lg:grid-cols-[320px_1fr]">

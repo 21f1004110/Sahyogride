@@ -88,7 +88,12 @@ def _smart_fallback(db: Session, query: str, parsed: dict) -> list[AISearchTripI
         purpose_rows = (
             db.query(Trip, _seats_available_subquery())
             .filter(Trip.purpose.ilike(f"%{parsed['purpose']}%"))
-            .order_by(Trip.departure_time)
+            # Newest first: many trips can share the same departure_time
+            # (e.g. a busy demo day), and ordering by that alone would let
+            # an arbitrary tie-break silently drop a genuinely-matching,
+            # just-published trip once a database has more than `limit`
+            # matches - recency is a safer tiebreak than insertion order.
+            .order_by(Trip.id.desc())
             .limit(50)
             .all()
         )
@@ -107,7 +112,7 @@ def _smart_fallback(db: Session, query: str, parsed: dict) -> list[AISearchTripI
                     Trip.destination.ilike(f"%{parsed['location_hint']}%"),
                 )
             )
-            .order_by(Trip.departure_time)
+            .order_by(Trip.id.desc())
             .limit(50)
             .all()
         )

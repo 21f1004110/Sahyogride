@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { motion, useReducedMotion } from "framer-motion";
@@ -48,9 +48,9 @@ function MatchScoreBar({ score }) {
   );
 }
 
-export default function AssistantBox() {
+export default function AssistantBox({ initialQuery = "" }) {
   const reduceMotion = useReducedMotion();
-  const [query, setQuery] = useState("");
+  const [query, setQuery] = useState(initialQuery);
 
   const searchMutation = useMutation({
     mutationFn: (q) => aiSearch(q),
@@ -62,6 +62,14 @@ export default function AssistantBox() {
     setQuery(text);
     searchMutation.mutate(trimmed);
   }
+
+  // Lets a link elsewhere in the app (e.g. the help assistant's "no trip
+  // matched, try searching" suggestion) land here with the search already
+  // run, instead of dropping the rider on a blank box.
+  useEffect(() => {
+    if (initialQuery.trim()) runSearch(initialQuery);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialQuery]);
 
   function handleSubmit(e) {
     e.preventDefault();

@@ -39,10 +39,14 @@ def ai_search_get_endpoint(
 @router.post("/assistant", response_model=AssistantAnswerResponse)
 def assistant_endpoint(
     body: AssistantQuestionRequest,
+    db: Session = Depends(get_db),
     _user: User = Depends(get_current_user),
 ) -> AssistantAnswerResponse:
     """General how-does-this-app-work help, available to any authenticated
-    user (rider or coordinator) - no DB session needed, this never reads
-    or writes trip/reservation data (SAHYOG-45).
+    user (rider or coordinator) (SAHYOG-45). Also recognises a trip-
+    seeking question ("how can I go to the hospital") and returns real,
+    clickable trip suggestions via the same read-only search used by
+    /ai/search - still zero write power, and FAQ answers about app
+    mechanics never touch the database.
     """
-    return rider_assistant.answer_question(body.question)
+    return rider_assistant.answer_question(db, body.question)
