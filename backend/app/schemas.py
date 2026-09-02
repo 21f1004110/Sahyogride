@@ -292,6 +292,20 @@ class SimilarTripsResponse(BaseModel):
     fallback: bool
 
 
+class TripDraftRequest(BaseModel):
+    description: str = Field(min_length=1, max_length=500)
+
+
+class TripDraftResponse(BaseModel):
+    origin: str | None = None
+    destination: str | None = None
+    departure_date: str | None = None
+    departure_time: str | None = None
+    purpose: str | None = None
+    total_seats: int | None = None
+    fallback: bool
+
+
 class AssistantQuestionRequest(BaseModel):
     question: str = Field(min_length=1, max_length=300)
 

@@ -25,6 +25,11 @@ export async function createTrip({
   return res.data;
 }
 
+export async function draftTrip(description) {
+  const res = await client.post("/trips/draft", { description });
+  return res.data;
+}
+
 export async function searchTrips({ origin, destination, date, q } = {}) {
   const params = {};
   if (origin) params.origin = origin;

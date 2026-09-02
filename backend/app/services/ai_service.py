@@ -327,6 +327,57 @@ def answer_rider_question(question: str, faq_context: str) -> AssistantAnswerRes
     return _run_with_timeout(_call)
 
 
+class TripDraftResult(BaseModel):
+    origin: str | None = None
+    destination: str | None = None
+    departure_date: str | None = None
+    departure_time: str | None = None
+    purpose: str | None = None
+    total_seats: int | None = Field(default=None, ge=1, le=100)
+
+
+def parse_trip_description(description: str, today: str) -> TripDraftResult | None:
+    """Extracts a structured trip draft from a coordinator's one-sentence
+    description (e.g. "shuttle for dialysis patients, City Hospital to
+    Metro Station, Friday 9am, 30 seats") to prefill the Create Trip form.
+    The coordinator reviews and can edit every field before anything is
+    created - this function has no DB access and creates nothing itself,
+    it only ever suggests values for a form a human still submits.
+    """
+    client = _get_client()
+    if client is None or not description:
+        return None
+
+    def _call() -> TripDraftResult:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {
+                    "role": "system",
+                    "content": (
+                        "You extract a structured shuttle trip draft from a coordinator's "
+                        "free-text description, to prefill a form they will still review "
+                        f"before submitting. Today's date is {today}. Reply with JSON only, "
+                        'no prose: {"origin": <string or null>, "destination": <string or '
+                        'null>, "departure_date": <"YYYY-MM-DD" or null>, "departure_time": '
+                        '<"HH:MM" 24-hour or null>, "purpose": <short string or null>, '
+                        '"total_seats": <integer 1-100 or null>}. Only include a field you '
+                        "are actually confident about from the text - never invent an "
+                        "origin or destination that wasn't mentioned, and leave a field "
+                        "null rather than guessing at it."
+                    ),
+                },
+                {"role": "user", "content": description},
+            ],
+            response_format={"type": "json_object"},
+            timeout=settings.ai_timeout_seconds,
+        )
+        raw = json.loads(response.choices[0].message.content)
+        return TripDraftResult.model_validate(raw)
+
+    return _run_with_timeout(_call)
+
+
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 

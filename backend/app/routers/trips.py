@@ -17,6 +17,8 @@ from app.schemas import (
     SimilarTripsResponse,
     TripCreateRequest,
     TripDetailOut,
+    TripDraftRequest,
+    TripDraftResponse,
     TripListItem,
     TripListResponse,
     TripOut,
@@ -24,6 +26,7 @@ from app.schemas import (
 from app.services import bus_stops as bus_stops_service
 from app.services.seat_recommendation import recommend_seat
 from app.services.similar_trips import find_similar_trips
+from app.services.trip_draft import parse_trip_draft
 from app.services.trip_embedding import run_trip_embedding
 from app.services.trip_service import (
     create_trip,
@@ -35,6 +38,16 @@ from app.services.trip_service import (
 )
 
 router = APIRouter(prefix="/trips", tags=["trips"])
+
+
+@router.post("/draft", response_model=TripDraftResponse)
+def trip_draft_endpoint(
+    body: TripDraftRequest,
+    _coordinator: User = Depends(require_role(UserRole.COORDINATOR)),
+) -> TripDraftResponse:
+    """Prefills the Create Trip form from a one-sentence description.
+    Stateless - no DB access, no trip is created here."""
+    return parse_trip_draft(body.description)
 
 
 @router.post("", response_model=TripOut, status_code=status.HTTP_201_CREATED)

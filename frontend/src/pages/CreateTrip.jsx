@@ -7,11 +7,12 @@ import {
   LightBulbIcon,
   MapPinIcon,
   PlusCircleIcon,
+  SparklesIcon,
   TagIcon,
   UsersIcon,
 } from "@heroicons/react/24/outline";
 
-import { createTrip } from "../api/trips";
+import { createTrip, draftTrip } from "../api/trips";
 import ErrorState from "../components/states/ErrorState";
 import GeoMap from "../components/GeoMap";
 
@@ -74,6 +75,49 @@ export default function CreateTrip() {
   const [isLocating, setIsLocating] = useState(false);
   const [error, setError] = useState(null);
   const [created, setCreated] = useState(null);
+  const [description, setDescription] = useState("");
+  const [drafting, setDrafting] = useState(false);
+  const [draftNote, setDraftNote] = useState(null);
+
+  async function handleDraft() {
+    const trimmed = description.trim();
+    if (!trimmed || drafting) return;
+    setDrafting(true);
+    setDraftNote(null);
+    try {
+      const draft = await draftTrip(trimmed);
+      const filled = [];
+      if (draft.origin) {
+        setOrigin(draft.origin);
+        setOriginLat("");
+        setOriginLng("");
+        filled.push("origin");
+      }
+      if (draft.destination) {
+        setDestination(draft.destination);
+        setDestinationLat("");
+        setDestinationLng("");
+        filled.push("destination");
+      }
+      if (draft.departure_date) {
+        setDepartureTime(`${draft.departure_date}T${draft.departure_time || "09:00"}`);
+        filled.push("departure time");
+      }
+      if (draft.purpose) {
+        setPurpose(draft.purpose);
+        filled.push("purpose");
+      }
+      if (draft.total_seats) {
+        setTotalSeats(draft.total_seats);
+        filled.push("seats");
+      }
+      setDraftNote(filled.length > 0 ? { filled, fallback: draft.fallback } : { empty: true });
+    } catch {
+      setDraftNote({ error: true });
+    } finally {
+      setDrafting(false);
+    }
+  }
 
   // Geocode on blur, only if the rider/coordinator hasn't already set
   // coordinates some other way (e.g. "use my location" below) - typing
@@ -199,6 +243,44 @@ export default function CreateTrip() {
             )}
           </AnimatePresence>
           {error && <ErrorState message={error} />}
+
+          <div className="rounded-xl border border-primary-100 bg-primary-50/50 p-4 space-y-2.5">
+            <label htmlFor="trip-description" className="field-label flex items-center gap-1.5 !text-primary-700">
+              <SparklesIcon className="w-4 h-4" aria-hidden="true" />
+              Describe your trip, and AI fills the form
+            </label>
+            <textarea
+              id="trip-description"
+              rows={2}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder='e.g. "Shuttle for dialysis patients, City Hospital to Metro Station, this Friday 9am, 30 seats"'
+              className="input-field !mt-0 w-full resize-none"
+            />
+            <button
+              type="button"
+              onClick={handleDraft}
+              disabled={drafting || !description.trim()}
+              className="btn-secondary text-sm !py-1.5"
+            >
+              {drafting ? "Filling…" : "Fill form with AI"}
+            </button>
+            {draftNote && !draftNote.error && !draftNote.empty && (
+              <p className="text-xs text-primary-700">
+                Filled {draftNote.filled.join(", ")}
+                {draftNote.fallback ? " using basic parsing" : " with AI"} — review before creating.
+              </p>
+            )}
+            {draftNote?.empty && (
+              <p className="text-xs text-gray-500">
+                Couldn't pick anything out of that — try mentioning an origin and destination, or fill the
+                fields below manually.
+              </p>
+            )}
+            {draftNote?.error && (
+              <p className="text-xs text-red-600">Couldn't fill the form automatically — please fill it in manually.</p>
+            )}
+          </div>
 
           <div>
             <div className="flex items-center justify-between">
