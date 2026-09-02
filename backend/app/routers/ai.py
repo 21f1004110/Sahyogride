@@ -49,4 +49,4 @@ def assistant_endpoint(
     /ai/search - still zero write power, and FAQ answers about app
     mechanics never touch the database.
     """
-    return rider_assistant.answer_question(db, body.question)
+    return rider_assistant.answer_question(db, body.question, _user.role)

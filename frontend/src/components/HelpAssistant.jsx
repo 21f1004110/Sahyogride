@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import {
+  ArrowRightIcon,
   ChatBubbleLeftRightIcon,
   ClockIcon,
   MagnifyingGlassIcon,
@@ -19,6 +20,8 @@ const STARTER_QUESTIONS = [
   "How do I cancel a booking?",
   "Does this cost anything?",
   "How can I track the vehicle?",
+  "Which seat should I pick?",
+  "What's the difference between a hold and a reservation?",
 ];
 
 export default function HelpAssistant() {
@@ -39,6 +42,7 @@ export default function HelpAssistant() {
           fallback: data.fallback,
           suggestedTrips: data.suggested_trips,
           suggestedQuery: data.suggested_query,
+          suggestedLink: data.suggested_link,
         },
       ]);
     },
@@ -172,6 +176,17 @@ export default function HelpAssistant() {
                     >
                       <MagnifyingGlassIcon className="w-3.5 h-3.5 shrink-0" aria-hidden="true" />
                       Search trips for "{msg.suggestedQuery}"
+                    </Link>
+                  )}
+
+                  {msg.role === "assistant" && msg.suggestedLink && !msg.suggestedTrips?.length && (
+                    <Link
+                      to={msg.suggestedLink.path}
+                      onClick={() => setOpen(false)}
+                      className="mt-1.5 inline-flex items-center gap-1.5 text-xs font-medium text-primary-600 hover:text-primary-700 bg-primary-50 hover:bg-primary-100 border border-primary-100 rounded-full px-3 py-1.5 transition"
+                    >
+                      {msg.suggestedLink.label}
+                      <ArrowRightIcon className="w-3 h-3 shrink-0" aria-hidden="true" />
                     </Link>
                   )}
                 </div>

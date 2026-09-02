@@ -296,8 +296,17 @@ class AssistantQuestionRequest(BaseModel):
     question: str = Field(min_length=1, max_length=300)
 
 
+class SuggestedLink(BaseModel):
+    """A page the assistant thinks is worth going to next - always a real,
+    already-existing route, never a place the assistant "did something" to."""
+
+    label: str
+    path: str
+
+
 class AssistantAnswerResponse(BaseModel):
     answer: str
     fallback: bool
     suggested_trips: list[AISearchTripItem] | None = None
     suggested_query: str | None = None
+    suggested_link: SuggestedLink | None = None

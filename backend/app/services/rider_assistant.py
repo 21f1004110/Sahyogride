@@ -9,11 +9,15 @@
 # inside hold_seat()/confirm_reservation()'s locked transaction, never
 # calls either, never writes anything - CLAUDE.md rule #3, zero write
 # power either way.
+#
+# Every answer also carries a `suggested_link` to a real, already-existing
+# page - the assistant can point somewhere, it can never navigate for you
+# or perform an action there.
 
 from sqlalchemy.orm import Session
 
 from app.config import settings
-from app.schemas import AssistantAnswerResponse
+from app.schemas import AssistantAnswerResponse, SuggestedLink
 from app.services import ai_service
 from app.services.ai_search import ai_search
 from app.services.query_understanding import parse_query
@@ -22,6 +26,11 @@ from app.services.query_understanding import parse_query
 # prompt) and doubles as the deterministic fallback when AI is off,
 # unconfigured, or times out - keyword-matched below, same "always works
 # with AI disabled" guarantee as ai_search's keyword fallback.
+#
+# `link` is optional per topic and points at a real frontend route; a
+# `roles` set restricts it to the roles that can actually open that page
+# (e.g. "My trips" is coordinator-only) - the text answer is never
+# role-gated, only the navigation shortcut is.
 FAQ = [
     {
         "topic": "how to book a ride (overview)",
@@ -35,6 +44,7 @@ FAQ = [
             f"- that's it, your seat is booked. A hold only lasts {{hold_ttl}} minutes, so "
             "confirm before it expires."
         ),
+        "link": {"label": "Search trips", "path": "/trips"},
     },
     {
         "topic": "holding a seat",
@@ -44,6 +54,7 @@ FAQ = [
             f"{{hold_ttl}} minutes - confirm within that window or the seat goes back "
             "to available for someone else."
         ),
+        "link": {"label": "Search trips", "path": "/trips"},
     },
     {
         "topic": "hold expiry",
@@ -52,6 +63,7 @@ FAQ = [
             "Holds last {hold_ttl} minutes. If the countdown runs out before you confirm, "
             "the seat is released automatically - just pick a seat again."
         ),
+        "link": {"label": "Search trips", "path": "/trips"},
     },
     {
         "topic": "confirming a reservation",
@@ -61,6 +73,7 @@ FAQ = [
             "can reach you) and tap 'Confirm reservation'. You can also add an optional note, "
             "e.g. accessibility needs."
         ),
+        "link": {"label": "Search trips", "path": "/trips"},
     },
     {
         "topic": "cancelling",
@@ -69,6 +82,7 @@ FAQ = [
             "Go to 'My reservations' and tap 'Cancel' on the booking - this frees the seat "
             "immediately for another rider."
         ),
+        "link": {"label": "My reservations", "path": "/reservations"},
     },
     {
         "topic": "tracking the vehicle",
@@ -83,6 +97,7 @@ FAQ = [
             "vehicle is currently at. If it says tracking hasn't been set up yet, the "
             "coordinator hasn't added a route for that trip."
         ),
+        "link": {"label": "My reservations", "path": "/reservations"},
     },
     {
         "topic": "payment",
@@ -103,6 +118,34 @@ FAQ = [
             "coordinator about any accessibility needs, e.g. wheelchair access or travelling "
             "with a child."
         ),
+        "link": {"label": "Search trips", "path": "/trips"},
+    },
+    {
+        "topic": "seat suggestions",
+        "keywords": [
+            "seat suggestion", "suggest a seat", "which seat should i", "recommend a seat",
+            "help me pick a seat", "best seat for me", "which seat is best",
+        ],
+        "answer": (
+            "Open any trip and use the 'Want a seat suggestion?' box above the seat map - "
+            "describe what you need (e.g. wheelchair, travelling with a toddler, motion "
+            "sickness) and it highlights one seat with a reason, plus a one-tap button to "
+            "hold that exact seat."
+        ),
+        "link": {"label": "Search trips", "path": "/trips"},
+    },
+    {
+        "topic": "hold vs reservation",
+        "keywords": [
+            "difference between a hold", "what's a hold", "what is a hold",
+            "what does confirmed mean", "hold vs reservation", "hold or a reservation",
+        ],
+        "answer": (
+            "A hold is a temporary claim on one seat - it lasts {hold_ttl} minutes and can "
+            "still be taken back if you don't confirm in time. Confirming turns it into a "
+            "permanent reservation with your name and phone number, which only a "
+            "cancellation can undo."
+        ),
     },
     {
         "topic": "creating a trip",
@@ -114,6 +157,33 @@ FAQ = [
             "Coordinators can create a trip from 'My trips' - set the origin, destination, "
             "departure time, and number of seats, and seats are generated automatically."
         ),
+        "link": {"label": "Create a trip", "path": "/trips/new", "roles": {"coordinator"}},
+    },
+    {
+        "topic": "passenger list",
+        "keywords": [
+            "passenger list", "who booked my trip", "who is on my trip", "see riders",
+            "who's coming", "list of passengers",
+        ],
+        "answer": (
+            "Open 'My trips', pick a trip, and select 'View passengers' to see everyone "
+            "who's confirmed a seat, along with an AI-generated urgency and accessibility "
+            "summary for the whole trip."
+        ),
+        "link": {"label": "My trips", "path": "/my-trips", "roles": {"coordinator"}},
+    },
+    {
+        "topic": "managing the route/stops",
+        "keywords": [
+            "add stops", "set stops", "manage route", "manage the stops",
+            "update the tracker", "set the current stop",
+        ],
+        "answer": (
+            "From 'My trips', open a trip to manage its stops - add the route as a simple "
+            "ordered list, then advance 'current stop' as the vehicle moves so riders see "
+            "live progress on their tracker."
+        ),
+        "link": {"label": "My trips", "path": "/my-trips", "roles": {"coordinator"}},
     },
     {
         "topic": "running late or missing the vehicle",
@@ -127,36 +197,47 @@ FAQ = [
             "they can reach you if needed - if you can no longer make it, cancel your seat "
             "from 'My reservations' so it frees up for someone else."
         ),
+        "link": {"label": "My reservations", "path": "/reservations"},
     },
     {
         "topic": "contact/lookup",
         "keywords": ["my booking", "my reservation status", "where is my", "status of my"],
         "answer": "Check 'My reservations' for the status of any booking you've made.",
+        "link": {"label": "My reservations", "path": "/reservations"},
     },
 ]
 
 DEFAULT_ANSWER = (
-    "I can help with holding/confirming a seat, cancellations, accessibility notes, "
-    "tracking the vehicle, and creating trips (for coordinators). Try asking about one "
-    "of those, or check 'My reservations' / 'My trips' for anything booking-specific."
+    "I can help with holding/confirming a seat, cancellations, seat suggestions, "
+    "accessibility notes, tracking the vehicle, and creating trips (for coordinators). "
+    "Try asking about one of those, or check 'My reservations' / 'My trips' for anything "
+    "booking-specific."
 )
+
+# Every answer gets somewhere to go, even one the FAQ has no topic for -
+# a chatbot that only ever talks is a dead end; this keeps it actionable.
+DEFAULT_LINK = {"label": "Search trips", "path": "/trips"}
 
 
 def _render(answer: str) -> str:
     return answer.format(hold_ttl=settings.hold_ttl_minutes)
 
 
-def _matches_faq_topic(question: str) -> bool:
-    lowered = question.lower()
-    return any(any(keyword in lowered for keyword in entry["keywords"]) for entry in FAQ)
-
-
-def _keyword_fallback(question: str) -> str:
+def _find_faq_match(question: str) -> dict | None:
     lowered = question.lower()
     for entry in FAQ:
         if any(keyword in lowered for keyword in entry["keywords"]):
-            return _render(entry["answer"])
-    return DEFAULT_ANSWER
+            return entry
+    return None
+
+
+def _resolve_link(entry: dict | None, role: str) -> SuggestedLink:
+    link = entry.get("link") if entry else None
+    if link:
+        roles = link.get("roles")
+        if not roles or role in roles:
+            return SuggestedLink(label=link["label"], path=link["path"])
+    return SuggestedLink(**DEFAULT_LINK)
 
 
 def _faq_context() -> str:
@@ -185,6 +266,8 @@ def _search_and_suggest(db: Session, question: str) -> AssistantAnswerResponse:
         answer = f"I found {count} that might work - tap one below to see seats and book."
         return AssistantAnswerResponse(answer=answer, fallback=True, suggested_trips=matches)
 
+    # suggested_query already gives a more specific "/trips?q=..." link on
+    # the frontend than the generic DEFAULT_LINK would - no need for both.
     return AssistantAnswerResponse(
         answer="I couldn't find a matching trip right now - try searching directly, or adjust the date.",
         fallback=True,
@@ -192,18 +275,23 @@ def _search_and_suggest(db: Session, question: str) -> AssistantAnswerResponse:
     )
 
 
-def answer_question(db: Session, question: str) -> AssistantAnswerResponse:
+def answer_question(db: Session, question: str, role: str) -> AssistantAnswerResponse:
+    matched = _find_faq_match(question)
+
     # A question explicitly about how a feature works (holding, cancelling,
     # tracking, ...) always gets that answer, even if it also happens to
     # mention a place - "how do I cancel my hospital trip" is about
     # cancelling, not a new search.
-    if not _matches_faq_topic(question) and _looks_like_a_trip_request(question):
+    if not matched and _looks_like_a_trip_request(question):
         return _search_and_suggest(db, question)
+
+    link = _resolve_link(matched, role)
 
     result = ai_service.answer_rider_question(question, _faq_context())
     if result is not None:
-        return AssistantAnswerResponse(answer=result.answer, fallback=False)
+        return AssistantAnswerResponse(answer=result.answer, fallback=False, suggested_link=link)
 
     # AI off, unconfigured, or the call failed/timed out - fall back to a
     # deterministic keyword match over the same FAQ, never an error.
-    return AssistantAnswerResponse(answer=_keyword_fallback(question), fallback=True)
+    answer = _render(matched["answer"]) if matched else DEFAULT_ANSWER
+    return AssistantAnswerResponse(answer=answer, fallback=True, suggested_link=link)

@@ -281,6 +281,64 @@ def test_assistant_returns_suggested_query_when_no_trip_matches():
         assert len(body["suggested_trips"]) > 0
 
 
+# ── Navigation links: every FAQ-style answer points somewhere real, and
+# a coordinator-only page is never suggested to a rider (or vice versa).
+
+
+def test_assistant_cancel_answer_links_to_my_reservations():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant", json={"question": "how do I cancel my booking?"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    link = res.json()["suggested_link"]
+    assert link == {"label": "My reservations", "path": "/reservations"}
+
+
+def test_assistant_create_trip_answer_links_coordinators_to_new_trip_page():
+    coordinator = register("coordinator")
+    res = client.post(
+        "/ai/assistant", json={"question": "who can create trips?"}, headers=auth_header(coordinator["token"])
+    )
+    assert res.status_code == 200
+    link = res.json()["suggested_link"]
+    assert link == {"label": "Create a trip", "path": "/trips/new"}
+
+
+def test_assistant_create_trip_answer_does_not_link_a_rider_to_a_coordinator_only_page():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant", json={"question": "who can create trips?"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    body = res.json()
+    # The rider still gets the informative text answer - just not a link
+    # to a page they can't open - falls back to the generic default link.
+    assert "coordinator" in body["answer"].lower()
+    assert body["suggested_link"] == {"label": "Search trips", "path": "/trips"}
+
+
+def test_assistant_seat_suggestion_question_gets_a_real_answer_not_the_default():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant",
+        json={"question": "which seat should I pick?"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    answer = res.json()["answer"].lower()
+    assert "seat suggestion" in answer or "want a seat suggestion" in answer
+
+
+def test_assistant_unmatched_question_still_gets_a_default_navigation_link():
+    rider = register("rider")
+    res = client.post(
+        "/ai/assistant", json={"question": "what is the meaning of life"}, headers=auth_header(rider["token"])
+    )
+    assert res.status_code == 200
+    assert res.json()["suggested_link"] == {"label": "Search trips", "path": "/trips"}
+
+
 def test_assistant_regular_questions_unaffected_by_trip_suggestion_routing():
     rider = register("rider")
     res = client.post(
