@@ -303,6 +303,24 @@ def test_recommendation_fallback_motion_sickness_prefers_front_row(monkeypatch):
     assert "front" in body["reason"].lower()
 
 
+def test_recommendation_fallback_back_row_request_prefers_the_last_row(monkeypatch):
+    monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
+    coordinator = register("coordinator")
+    rider = register("rider")
+    trip = create_trip(coordinator["token"], total_seats=20)
+
+    res = client.post(
+        f"/trips/{trip['id']}/seat-recommendation",
+        json={"note": "I'd like to sit at the back, somewhere quiet"},
+        headers=auth_header(rider["token"]),
+    )
+    assert res.status_code == 200
+    body = res.json()
+    pos = _seat_position(body["seat_number"])
+    assert pos["row"] == 5  # 20 seats / 4 per row = 5 rows, back row is 5
+    assert "back" in body["reason"].lower()
+
+
 def test_recommendation_fallback_aisle_request_prefers_aisle_seat(monkeypatch):
     monkeypatch.setattr(ai_service, "recommend_seat", lambda note, seats: None)
     coordinator = register("coordinator")

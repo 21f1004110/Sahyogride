@@ -20,6 +20,16 @@ import SimilarTrips from "../components/SimilarTrips";
 import AnimatedNumber from "../components/AnimatedNumber";
 import BusStopTracker from "../components/BusStopTracker";
 
+// One-click prompts so a demo never depends on someone typing a good
+// example live - each exercises a different branch of the fallback
+// heuristics in seat_recommendation.py (aisle-near-front, window, front-row).
+const SEAT_NOTE_EXAMPLES = [
+  "I use a wheelchair",
+  "travelling with a toddler",
+  "I get motion sickness",
+  "I'd like to sit at the back",
+];
+
 function SeatLegend({ counts }) {
   return (
     <ul className="space-y-2.5">
@@ -337,7 +347,7 @@ export default function TripDetail() {
               </h2>
               <p className="text-sm text-gray-500 mb-3">
                 e.g. &ldquo;I use a wheelchair&rdquo; or &ldquo;travelling with a toddler&rdquo; — this
-                only highlights a seat, you still have to click it yourself.
+                only highlights a seat, you decide whether to take it.
               </p>
               <form onSubmit={handleSuggestSubmit} className="flex gap-2">
                 <input
@@ -352,20 +362,65 @@ export default function TripDetail() {
                   {suggestMutation.isPending ? "Thinking…" : "Suggest"}
                 </button>
               </form>
+
+              {!suggestion && (
+                <div className="flex flex-wrap gap-2 mt-3">
+                  {SEAT_NOTE_EXAMPLES.map((example) => (
+                    <button
+                      key={example}
+                      type="button"
+                      onClick={() => {
+                        setSeatNote(example);
+                        suggestMutation.mutate(example);
+                      }}
+                      className="text-xs text-primary-700 bg-primary-50/70 hover:bg-primary-100 border border-primary-100 rounded-full px-3 py-1.5 transition"
+                    >
+                      &ldquo;{example}&rdquo;
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {suggestion && (
-                <p className="text-sm text-gray-600 mt-3">
+                <div className="mt-3 rounded-xl border border-primary-100 bg-primary-50/40 px-4 py-3">
                   {suggestion.seat_number ? (
                     <>
-                      Seat <span className="font-semibold text-gray-900">{suggestion.seat_number}</span>
-                      {suggestion.reason ? ` — ${suggestion.reason}` : ""}{" "}
-                      <span className="text-xs text-gray-400">
-                        ({suggestion.fallback ? "nearest available" : "suggested by AI"})
-                      </span>
+                      <p className="text-sm text-gray-700">
+                        Seat <span className="font-semibold text-gray-900">{suggestion.seat_number}</span>
+                        {suggestion.reason ? ` — ${suggestion.reason}` : ""}
+                      </p>
+                      <div className="flex items-center justify-between gap-2 mt-2.5">
+                        <span className="text-xs text-gray-400">
+                          {suggestion.fallback ? "Nearest available match" : "Suggested by AI"}
+                        </span>
+                        {activeHold ? (
+                          <span className="text-xs text-gray-500">
+                            Confirm or release your current hold first.
+                          </span>
+                        ) : suggestedSeat?.status === "available" ? (
+                          <button
+                            type="button"
+                            onClick={() => handleSeatClick(suggestedSeat)}
+                            disabled={holdMutation.isPending}
+                            className="btn-primary !py-1.5 !px-3 text-sm shrink-0"
+                          >
+                            {holdMutation.isPending ? "Holding…" : `Hold seat ${suggestion.seat_number}`}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => suggestMutation.mutate(seatNote)}
+                            className="text-xs font-medium text-primary-600 hover:text-primary-700 shrink-0"
+                          >
+                            That seat was just taken — suggest another
+                          </button>
+                        )}
+                      </div>
                     </>
                   ) : (
-                    "No seats available to suggest right now."
+                    <p className="text-sm text-gray-600">No seats available to suggest right now.</p>
                   )}
-                </p>
+                </div>
               )}
             </div>
           )}

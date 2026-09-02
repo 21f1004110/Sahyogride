@@ -31,76 +31,89 @@ def _describe_position(seat_number: str) -> dict:
 # unavailable seat) - this is the path that actually runs in this
 # project's environment (no AI_API_KEY configured), so it needs to be
 # genuinely useful on its own, not just "pick seat 1". Checked in order;
-# first match wins. Each entry: (keywords, preferred edge, prefer front rows, reason).
-_PREFERENCE_RULES: list[tuple[list[str], str | None, bool, str]] = [
+# first match wins. Each entry: (keywords, preferred edge, row preference, reason).
+# row preference is "front" (closest to row 1), "back" (furthest row), or
+# None (row doesn't matter - only the edge, if any, is honored).
+_PREFERENCE_RULES: list[tuple[list[str], str | None, str | None, str]] = [
     (
         ["wheelchair", "walker", "crutch", "mobility"],
         "aisle",
-        True,
+        "front",
         "An aisle seat near the front, for easier wheelchair/mobility access and boarding.",
     ),
     (
         ["pregnant", "pregnancy"],
         "aisle",
-        True,
+        "front",
         "An aisle seat near the front, for easier and quicker access on and off.",
     ),
     (
         ["elderly", "senior citizen", "senior", "old age", "grandmother", "grandfather", "grandma", "grandpa"],
         "aisle",
-        True,
+        "front",
         "An aisle seat near the front, so there's less distance and no climbing over anyone.",
     ),
     (
         ["motion sickness", "car sick", "carsick", "nausea", "nauseous", "travel sickness"],
         None,
-        True,
+        "front",
         "A front-row seat, where the ride is smoothest and motion is felt least.",
     ),
     (
         ["toddler", "child", "kid", "infant", "baby"],
         "window",
-        False,
+        None,
         "A window seat, to keep a child settled and safely away from the aisle.",
+    ),
+    (
+        ["back row", "sit at the back", "rear seat", "back of the bus", "last row", "quiet seat", "quieter"],
+        None,
+        "back",
+        "A back-row seat, as requested - furthest from the door and the driver.",
     ),
     (
         ["aisle seat", "aisle", "leg room", "legroom", "stretch my legs"],
         "aisle",
-        False,
+        None,
         "An aisle seat, as requested, with easy access to get up.",
     ),
     (
         ["window seat", "by the window", "near the window", "window"],
         "window",
-        False,
+        None,
         "A window seat, as requested.",
     ),
 ]
 
 
-def _infer_preference(note: str) -> tuple[str | None, bool, str | None]:
-    """Returns (preferred_edge, prefer_front_rows, reason) for the first
-    matching rule, or (None, False, None) if the note matches nothing
+def _infer_preference(note: str) -> tuple[str | None, str | None, str | None]:
+    """Returns (preferred_edge, row_preference, reason) for the first
+    matching rule, or (None, None, None) if the note matches nothing
     specific - callers fall back to nearest-available in that case.
     """
     lowered = note.lower()
-    for keywords, edge, prefer_front, reason in _PREFERENCE_RULES:
+    for keywords, edge, row_pref, reason in _PREFERENCE_RULES:
         if any(keyword in lowered for keyword in keywords):
-            return edge, prefer_front, reason
-    return None, False, None
+            return edge, row_pref, reason
+    return None, None, None
 
 
 def _fallback_pick(available: list, note: str) -> tuple[str, str]:
     """Picks the best available seat for the note's inferred preference
-    (edge + front-of-bus), falling back to the plain nearest-available
-    seat when nothing in the note matches a known need."""
-    edge, prefer_front, reason = _infer_preference(note)
+    (edge + row), falling back to the plain nearest-available seat when
+    nothing in the note matches a known need."""
+    edge, row_pref, reason = _infer_preference(note)
 
     def sort_key(seat):
         pos = _describe_position(seat.seat_number)
         edge_penalty = 0 if edge is None or pos["edge"] == edge else 1
-        row = pos["row"] if (edge is not None or prefer_front) else 0
-        return (edge_penalty, row, int(seat.seat_number))
+        if row_pref == "back":
+            row_key = -pos["row"]
+        elif row_pref == "front" or edge is not None:
+            row_key = pos["row"]
+        else:
+            row_key = 0
+        return (edge_penalty, row_key, int(seat.seat_number))
 
     best = min(available, key=sort_key)
     if reason is None:

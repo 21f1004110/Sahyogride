@@ -9,7 +9,7 @@ export default function SimilarTrips({ trips, fallback }) {
     <div className="card p-5">
       <h2 className="font-heading font-semibold text-gray-900 flex items-center gap-2 mb-1">
         <SparklesIcon className="w-5 h-5 text-primary-600" aria-hidden="true" />
-        This trip is nearly full — try these instead
+        Similar trips
       </h2>
       <ul className="space-y-2 mt-3">
         {trips.map((trip, i) => (

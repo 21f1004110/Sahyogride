@@ -9,6 +9,7 @@ import {
   SparklesIcon,
   TagIcon,
   UsersIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/outline";
 
 import { aiSearch } from "../api/ai";
@@ -76,6 +77,13 @@ export default function AssistantBox({ initialQuery = "" }) {
     runSearch(query);
   }
 
+  function clearSearch() {
+    setQuery("");
+    searchMutation.reset();
+  }
+
+  const hasSomethingToClear = Boolean(query) || searchMutation.isSuccess || searchMutation.isError;
+
   const parsed = searchMutation.data?.parsed;
   const hasParsedSignal = Boolean(
     parsed && (parsed.date_label || parsed.time_of_day || parsed.purpose || parsed.location_hint),
@@ -99,14 +107,26 @@ export default function AssistantBox({ initialQuery = "" }) {
       </p>
 
       <form onSubmit={handleSubmit} className="flex gap-2">
-        <input
-          type="text"
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="I need a ride to..."
-          aria-label="Describe the trip you need"
-          className="input-field !mt-0 flex-1"
-        />
+        <div className="relative flex-1">
+          <input
+            type="text"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="I need a ride to..."
+            aria-label="Describe the trip you need"
+            className="input-field !mt-0 w-full pr-9"
+          />
+          {hasSomethingToClear && (
+            <button
+              type="button"
+              onClick={clearSearch}
+              aria-label="Clear search and suggestions"
+              className="absolute right-1 top-1/2 -translate-y-1/2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded-full text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition"
+            >
+              <XMarkIcon className="w-4 h-4" aria-hidden="true" />
+            </button>
+          )}
+        </div>
         <button type="submit" disabled={searchMutation.isPending} className="btn-primary shrink-0">
           {searchMutation.isPending ? "Thinking…" : "Ask"}
         </button>
